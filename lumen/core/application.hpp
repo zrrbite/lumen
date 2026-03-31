@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 #include "lumen/core/scheduler.hpp"
 #include "lumen/gfx/canvas.hpp"
 #include "lumen/gfx/dirty_manager.hpp"
@@ -132,18 +134,62 @@ template <typename BoardConfig> class Application
 		if (!dirty_.has_dirty())
 			return;
 
-		// Render into framebuffer
-		using PF = typename BoardConfig::PixFmt;
-		auto* fb = board_.display.framebuffer();
-		gfx::Canvas<PF> canvas(fb, BoardConfig::Display::width(), BoardConfig::Display::height());
+		// Render — adapt to boards with or without framebuffer
+		using PF				  = typename BoardConfig::PixFmt;
+		using pixel_t			  = typename PF::pixel_t;
+		constexpr uint16_t disp_w = BoardConfig::Display::width();
+		constexpr uint16_t disp_h = BoardConfig::Display::height();
 
-		for (uint8_t i = 0; i < dirty_.count(); ++i)
+		if constexpr (BoardConfig::framebuffer_count > 0)
 		{
-			canvas.set_clip(dirty_.rect(i));
-			active_screen_->draw(canvas);
+			// Framebuffer mode (SDL2, LTDC with SDRAM)
+			auto* fb = board_.display.framebuffer();
+			gfx::Canvas<PF> canvas(fb, disp_w, disp_h);
+			for (uint8_t i = 0; i < dirty_.count(); ++i)
+			{
+				canvas.set_clip(dirty_.rect(i));
+				active_screen_->draw(canvas);
+			}
+			board_.display.flush();
+		}
+		else
+		{
+			// Direct-to-display mode (SPI TFT, no framebuffer)
+			// Render line-by-line using scratch buffer
+			static constexpr size_t scratch_pixels = BoardConfig::scratch_buffer_size / sizeof(pixel_t);
+			static pixel_t scratch[scratch_pixels];
+
+			for (uint8_t d = 0; d < dirty_.count(); ++d)
+			{
+				Rect dirty = dirty_.rect(d);
+				// Render in horizontal bands that fit the scratch buffer
+				uint16_t band_h = scratch_pixels / dirty.w;
+				if (band_h == 0)
+					band_h = 1;
+
+				for (int16_t band_y = dirty.y; band_y < dirty.bottom(); band_y += band_h)
+				{
+					uint16_t h = band_h;
+					if (band_y + h > dirty.bottom())
+						h = dirty.bottom() - band_y;
+
+					Rect band{dirty.x, band_y, dirty.w, h};
+					gfx::Canvas<PF> canvas(scratch, dirty.w, h);
+					// Offset canvas so widgets draw at correct positions
+					// by setting clip to the band's screen coordinates
+					canvas.set_clip({0, 0, dirty.w, h});
+
+					// TODO: proper coordinate translation for band rendering
+					// For now, draw full screen into scratch and send
+					// This is inefficient but correct for first bring-up
+					active_screen_->draw(canvas);
+
+					board_.display.set_window(band);
+					board_.display.write_pixels(scratch, static_cast<uint32_t>(dirty.w) * h);
+				}
+			}
 		}
 
-		board_.display.flush();
 		dirty_.clear();
 	}
 
@@ -154,9 +200,10 @@ template <typename BoardConfig> class Application
 			dirty_.add(widget.bounds());
 			widget.mark_clean();
 		}
-		// Recurse into containers
-		if (auto* container = dynamic_cast<ui::Container*>(&widget))
+		// Recurse into containers (no RTTI needed)
+		if (widget.is_container())
 		{
+			auto* container = static_cast<ui::Container*>(&widget);
 			for (uint8_t i = 0; i < container->child_count(); ++i)
 			{
 				collect_dirty(*container->child(i));

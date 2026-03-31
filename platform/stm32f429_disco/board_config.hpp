@@ -3,23 +3,25 @@
 /// STM32F429-DISCO Board Configuration for Lumen.
 ///
 /// Display: ILI9341 240x320 via SPI5
-/// SPI5 pins: PF7 (SCK), PF8 (MISO), PF9 (MOSI)
+/// Touch:   STMPE811 resistive via I2C3
+/// SPI5:    PF7 (SCK), PF8 (MISO), PF9 (MOSI)
+/// I2C3:    PA8 (SCL), PC9 (SDA)
 /// LCD_CS:  PC2
 /// LCD_DCX: PD13
 
 #include <cstddef>
 
 #include "drivers/display/ili9341_spi.hpp"
+#include "drivers/touch/stmpe811.hpp"
 #include "lumen/hal/input_driver.hpp"
 #include "lumen/hal/os/bare_metal.hpp"
 #include "lumen/hal/stm32/gpio.hpp"
+#include "lumen/hal/stm32/i2c.hpp"
 #include "lumen/hal/stm32/spi.hpp"
 #include "lumen/hal/tick_source.hpp"
-#include "lumen/hal/touch_driver.hpp"
 
 namespace lumen::platform {
 
-// F429-DISCO pin definitions
 using namespace hal::stm32;
 
 // SPI5 pins (AF5)
@@ -30,16 +32,20 @@ using SPI5_MOSI = GpioPin<Port::F, 9>;
 // LCD control pins
 using LCD_CS  = GpioPin<Port::C, 2>;
 using LCD_DCX = GpioPin<Port::D, 13>;
-using LCD_RST = GpioPin<Port::D, 12>; // Active-low reset
+using LCD_RST = GpioPin<Port::D, 12>;
 
-// SPI5 peripheral
-using SPI5 = Spi<SpiInstance::SPI5>;
+// I2C3 pins (AF4) for touch
+using I2C3_SCL = GpioPin<Port::A, 8>;
+using I2C3_SDA = GpioPin<Port::C, 9>;
 
-// ILI9341 display driver
-using Ili9341 = drivers::Ili9341Spi<SPI5, LCD_DCX, LCD_CS, LCD_RST>;
+// Peripherals
+using SPI5Drv = Spi<SpiInstance::SPI5>;
+using I2C3Drv = I2c<I2cInstance::I2C3>;
 
-/// Blocking millisecond delay using SysTick.
-/// Must be set up before use.
+// Drivers
+using Ili9341	  = drivers::Ili9341Spi<SPI5Drv, LCD_DCX, LCD_CS, LCD_RST>;
+using TouchDriver = drivers::Stmpe811<I2C3Drv>;
+
 extern hal::SysTickSource sys_tick;
 inline void delay_ms(uint32_t ms)
 {
@@ -50,45 +56,51 @@ struct Stm32f429DiscoConfig
 {
 	using PixFmt  = Rgb565;
 	using Display = Ili9341;
-	using Touch	  = hal::NullTouch; // No touch on basic ILI9341
+	using Touch	  = TouchDriver;
 	using Input	  = hal::NullInput;
 	using Tick	  = hal::SysTickSource;
 	using OS	  = hal::BareMetalOS;
 
-	static constexpr size_t framebuffer_count	= 0;   // Direct-to-display (no FB)
-	static constexpr size_t scratch_buffer_size = 960; // 240px * 2 bytes = 1 line
+	static constexpr size_t framebuffer_count	= 0;
+	static constexpr size_t scratch_buffer_size = 960;
 	static constexpr bool use_external_ram		= false;
 
 	Display display{delay_ms};
-	Touch touch;
+	Touch touch{delay_ms};
 	Input input;
 	Tick& tick = sys_tick;
 
 	void init_hardware()
 	{
 		// Enable GPIO clocks
+		enable_gpio_clock(Port::A);
 		enable_gpio_clock(Port::C);
 		enable_gpio_clock(Port::D);
 		enable_gpio_clock(Port::F);
 
-		// Configure SPI5 pins as AF5
+		// SPI5 pins (AF5)
 		SPI5_SCK::init_af(5);
 		SPI5_MISO::init_af(5);
 		SPI5_MOSI::init_af(5);
 
-		// Configure control pins as outputs
+		// LCD control pins
 		LCD_CS::init_output();
 		LCD_DCX::init_output();
 		LCD_RST::init_output();
 
-		// Init SPI5 (master, ~11MHz at 180MHz/16)
-		SPI5::init_master(3); // prescaler /16
+		// I2C3 pins (AF4, open-drain)
+		I2C3_SCL::init_af(4);
+		I2C3_SDA::init_af(4);
 
-		// Init display
+		// Init peripherals
+		SPI5Drv::init_master(3); // ~11MHz
+		I2C3Drv::init();
+
+		// Init drivers
 		display.init();
+		touch.init();
 	}
 
-	/// Always returns true (no windowing system to close).
 	bool poll_events() { return true; }
 };
 

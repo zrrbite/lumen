@@ -65,6 +65,9 @@ class Widget
 	}
 	bool is_visible() const { return visible_; }
 
+	/// Override in Container to support tree traversal without RTTI.
+	virtual bool is_container() const { return false; }
+
   protected:
 	Rect bounds_{};
 	Widget* parent_ = nullptr;

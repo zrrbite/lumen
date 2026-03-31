@@ -1,79 +1,94 @@
-/// Lumen Hello World on STM32F429-DISCO.
-/// Draws colored rectangles and text on the ILI9341 display.
+/// Lumen interactive demo on STM32F429-DISCO.
+/// Touch the buttons! Uses ILI9341 display + STMPE811 touch.
 
-#include "lumen/core/types.hpp"
-#include "lumen/gfx/font.hpp"
+#include <cstdio>
+
+#include "lumen/core/application.hpp"
+#include "lumen/ui/screen.hpp"
+#include "lumen/ui/widgets/button.hpp"
+#include "lumen/ui/widgets/label.hpp"
+#include "lumen/ui/widgets/progress_bar.hpp"
 #include "platform/stm32f429_disco/board_config.hpp"
 
 using Board = lumen::platform::Stm32f429DiscoConfig;
+
+static int touch_count	 = 0;
+static uint8_t bar_value = 0;
+
+class HelloScreen : public lumen::ui::Screen
+{
+  public:
+	HelloScreen()
+	{
+		title_.set_text("Lumen on STM32!");
+		title_.set_bounds({10, 10, 220, 20});
+		title_.set_color(lumen::Color::rgb(100, 200, 255));
+		title_.set_bg_color(lumen::Color::rgb(20, 20, 30));
+
+		counter_.set_text("Touches: 0");
+		counter_.set_bounds({10, 40, 220, 20});
+		counter_.set_bg_color(lumen::Color::rgb(20, 20, 30));
+
+		btn_.set_label("Touch Me!");
+		btn_.set_bounds({20, 80, 200, 60});
+		btn_.set_on_click([] {
+			++touch_count;
+			bar_value += 10;
+			if (bar_value > 100)
+				bar_value = 0;
+		});
+
+		reset_btn_.set_label("Reset");
+		reset_btn_.set_bounds({20, 160, 200, 50});
+		reset_btn_.set_color(lumen::Color::rgb(180, 60, 60), lumen::Color::rgb(120, 40, 40));
+		reset_btn_.set_on_click([] {
+			touch_count = 0;
+			bar_value	= 0;
+		});
+
+		bar_.set_bounds({20, 230, 200, 20});
+		bar_.set_fill_color(lumen::Color::rgb(50, 200, 80));
+
+		status_.set_text("Touch the buttons!");
+		status_.set_bounds({10, 270, 220, 20});
+		status_.set_color(lumen::Color::rgb(150, 150, 160));
+		status_.set_bg_color(lumen::Color::rgb(20, 20, 30));
+
+		add(title_);
+		add(counter_);
+		add(btn_);
+		add(reset_btn_);
+		add(bar_);
+		add(status_);
+	}
+
+	void update_model() override
+	{
+		char buf[32];
+		snprintf(buf, sizeof(buf), "Touches: %d", touch_count);
+		counter_.set_text(buf);
+		bar_.set_value(bar_value);
+	}
+
+  private:
+	lumen::ui::Label title_;
+	lumen::ui::Label counter_;
+	lumen::ui::Button btn_;
+	lumen::ui::Button reset_btn_;
+	lumen::ui::ProgressBar bar_;
+	lumen::ui::Label status_;
+};
 
 int main()
 {
 	Board board;
 	board.init_hardware();
 
-	auto& display = board.display;
+	lumen::Application<Board> app(board);
 
-	// Fill screen with dark background
-	display.fill({0, 0, 240, 320}, lumen::Color::rgb(20, 20, 30).to_rgb565());
-
-	// Draw colored rectangles
-	display.fill({20, 20, 200, 60}, lumen::Color::rgb(220, 50, 50).to_rgb565());
-	display.fill({20, 100, 200, 60}, lumen::Color::rgb(50, 180, 50).to_rgb565());
-	display.fill({20, 180, 200, 60}, lumen::Color::rgb(50, 100, 220).to_rgb565());
-
-	// Draw text using scratch buffer approach
-	// (direct-to-display rendering — no framebuffer on M4)
-	uint16_t line_buf[240]; // One line scratch
-
-	// Render "Hello, Lumen!" at y=270 line by line
-	const auto& font		= lumen::gfx::font_6x8;
-	const char* text		= "Hello, Lumen!";
-	lumen::Color text_color = lumen::Color::white();
-
-	for (uint8_t row = 0; row < font.char_height; ++row)
-	{
-		// Clear line
-		for (int col = 0; col < 240; ++col)
-		{
-			line_buf[col] = lumen::Color::rgb(20, 20, 30).to_rgb565();
-		}
-
-		// Render font row into line buffer
-		const char* ptr	 = text;
-		int16_t cursor_x = 20;
-		while (*ptr)
-		{
-			uint8_t ch = static_cast<uint8_t>(*ptr);
-			if (ch >= font.first_char && ch <= font.last_char)
-			{
-				uint16_t glyph_offset = (ch - font.first_char) * font.char_height * font.bytes_per_row;
-				uint8_t byte_val	  = font.data[glyph_offset + row * font.bytes_per_row];
-				for (uint8_t col = 0; col < font.char_width; ++col)
-				{
-					if (byte_val & (1 << (7 - col)))
-					{
-						if (cursor_x + col < 240)
-						{
-							line_buf[cursor_x + col] = text_color.to_rgb565();
-						}
-					}
-				}
-			}
-			cursor_x += font.char_width + 1;
-			++ptr;
-		}
-
-		// Send line to display
-		display.set_window({0, static_cast<int16_t>(270 + row), 240, 1});
-		display.write_pixels(line_buf, 240);
-	}
-
-	// Idle loop
-	while (true)
-	{
-		// WFI would go here for power saving
-	}
+	HelloScreen screen;
+	app.navigate_to(screen);
+	app.run();
 
 	return 0;
 }

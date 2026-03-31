@@ -151,3 +151,52 @@ extern "C" void Default_Handler()
 	while (true)
 	{}
 }
+
+// Newlib stubs for bare metal (no OS)
+extern "C" {
+int _kill(int, int)
+{
+	return -1;
+}
+int _getpid()
+{
+	return 1;
+}
+int _isatty(int)
+{
+	return 0;
+}
+int _close(int)
+{
+	return -1;
+}
+int _read(int, char*, int)
+{
+	return 0;
+}
+int _write(int, char*, int)
+{
+	return 0;
+}
+int _lseek(int, int, int)
+{
+	return 0;
+}
+int _fstat(int, void*)
+{
+	return 0;
+}
+void _exit(int)
+{
+	while (1)
+	{}
+}
+void* _sbrk(int incr)
+{
+	static char heap[4096];
+	static char* heap_end = heap;
+	char* prev			  = heap_end;
+	heap_end += incr;
+	return prev;
+}
+}

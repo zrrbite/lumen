@@ -23,6 +23,8 @@ SECTIONS
         . = ALIGN(4);
         *(.text)
         *(.text*)
+        *(.init)
+        *(.fini)
         *(.rodata)
         *(.rodata*)
         . = ALIGN(4);

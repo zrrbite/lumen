@@ -10,6 +10,8 @@ class Container : public Widget
   public:
 	static constexpr uint8_t MAX_CHILDREN = 32;
 
+	bool is_container() const override { return true; }
+
 	void add(Widget& child)
 	{
 		if (count_ < MAX_CHILDREN)
