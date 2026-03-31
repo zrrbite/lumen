@@ -9,9 +9,11 @@
 #include "platform/stm32f429_disco/board_config.hpp"
 
 using Board = lumen::platform::Stm32f429DiscoConfig;
+using App	= lumen::Application<Board>;
 
 static int touch_count	 = 0;
 static uint8_t bar_value = 0;
+static App* g_app		 = nullptr;
 
 // Simple int-to-string (no snprintf, no newlib locks)
 static void int_to_str(char* buf, const char* prefix, int val)
@@ -75,8 +77,13 @@ class HelloScreen : public lumen::ui::Screen
 		bar_.set_bounds({20, 230, 200, 20});
 		bar_.set_fill_color(lumen::Color::rgb(50, 200, 80));
 
+		perf_.set_text("FPS: --");
+		perf_.set_bounds({10, 270, 220, 20});
+		perf_.set_color(lumen::Color::rgb(100, 100, 120));
+		perf_.set_bg_color(lumen::Color::rgb(20, 20, 30));
+
 		status_.set_text("Touch the buttons!");
-		status_.set_bounds({10, 270, 220, 20});
+		status_.set_bounds({10, 296, 220, 20});
 		status_.set_color(lumen::Color::rgb(150, 150, 160));
 		status_.set_bg_color(lumen::Color::rgb(20, 20, 30));
 
@@ -85,6 +92,7 @@ class HelloScreen : public lumen::ui::Screen
 		add(btn_);
 		add(reset_btn_);
 		add(bar_);
+		add(perf_);
 		add(status_);
 	}
 
@@ -94,6 +102,25 @@ class HelloScreen : public lumen::ui::Screen
 		int_to_str(buf, "Touches: ", touch_count);
 		counter_.set_text(buf);
 		bar_.set_value(bar_value);
+
+		if (g_app)
+		{
+			const auto& stats = g_app->perf();
+			char pbuf[40];
+			int_to_str(pbuf, "FPS:", static_cast<int>(stats.fps));
+			char* p = pbuf;
+			while (*p)
+				++p;
+			*p++ = ' ';
+			int_to_str(p, "R:", static_cast<int>(stats.render_time_ms));
+			p = pbuf;
+			while (*p)
+				++p;
+			*p++ = 'm';
+			*p++ = 's';
+			*p	 = '\0';
+			perf_.set_text(pbuf);
+		}
 	}
 
   private:
@@ -102,6 +129,7 @@ class HelloScreen : public lumen::ui::Screen
 	lumen::ui::Button btn_;
 	lumen::ui::Button reset_btn_;
 	lumen::ui::ProgressBar bar_;
+	lumen::ui::Label perf_;
 	lumen::ui::Label status_;
 };
 
@@ -110,7 +138,8 @@ int main()
 	Board board;
 	board.init_hardware();
 
-	lumen::Application<Board> app(board);
+	App app(board);
+	g_app = &app;
 
 	HelloScreen screen;
 	app.navigate_to(screen);

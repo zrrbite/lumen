@@ -113,4 +113,18 @@ struct Argb8888
 /// Milliseconds since boot (wraps at ~49 days).
 using TickMs = uint32_t;
 
+/// Performance statistics updated each frame.
+struct PerfStats
+{
+	TickMs frame_time_ms  = 0; ///< Total time for last frame (model + render + flush)
+	TickMs render_time_ms = 0; ///< Time spent in rendering only (draw + flush)
+	uint16_t fps		  = 0; ///< Frames per second (updated once per second)
+	uint16_t dirty_pixels = 0; ///< Total dirty pixels last frame
+	uint32_t frame_count  = 0; ///< Total frames rendered
+
+	// Internal: FPS calculation state
+	uint32_t fps_frame_count_ = 0;
+	TickMs fps_last_tick_	  = 0;
+};
+
 } // namespace lumen

@@ -63,16 +63,23 @@ template <SpiInstance Inst> struct Spi
 		regs()->CR1 |= (1U << 6); // SPE
 	}
 
-	/// Transmit a single byte (blocking).
+	/// Transmit a single byte (blocking). Waits for BSY after.
 	static void transmit_byte(uint8_t data)
 	{
-		// Wait for TXE (transmit buffer empty)
 		while ((regs()->SR & (1U << 1)) == 0)
-		{}
+		{} // Wait TXE
 		*reinterpret_cast<volatile uint8_t*>(&regs()->DR) = data;
-		// Wait for BSY clear
 		while ((regs()->SR & (1U << 7)) != 0)
-		{}
+		{} // Wait BSY (needed for CS toggle after single-byte commands)
+	}
+
+	/// Wait for SPI to finish all pending transfers.
+	static void wait_idle()
+	{
+		while ((regs()->SR & (1U << 1)) == 0)
+		{} // Wait TXE
+		while ((regs()->SR & (1U << 7)) != 0)
+		{} // Wait BSY
 	}
 
 	/// Transmit a buffer (blocking).
@@ -80,18 +87,36 @@ template <SpiInstance Inst> struct Spi
 	{
 		for (uint32_t idx = 0; idx < len; ++idx)
 		{
-			transmit_byte(data[idx]);
+			while ((regs()->SR & (1U << 1)) == 0)
+			{} // Wait TXE
+			*reinterpret_cast<volatile uint8_t*>(&regs()->DR) = data[idx];
 		}
+		wait_idle();
 	}
 
-	/// Transmit 16-bit values (for pixel data).
+	/// Transmit 16-bit pixel data using 16-bit SPI mode.
+	/// Much faster than byte-by-byte: one register write per pixel,
+	/// no BSY wait between pixels, hardware handles byte ordering.
 	static void transmit16(const uint16_t* data, uint32_t count)
 	{
+		// Switch to 16-bit data frame
+		regs()->CR1 &= ~(1U << 6); // Disable SPE
+		regs()->CR1 |= (1U << 11); // DFF: 16-bit
+		regs()->CR1 |= (1U << 6);  // Enable SPE
+
 		for (uint32_t idx = 0; idx < count; ++idx)
 		{
-			transmit_byte(static_cast<uint8_t>(data[idx] >> 8));
-			transmit_byte(static_cast<uint8_t>(data[idx] & 0xFF));
+			while ((regs()->SR & (1U << 1)) == 0)
+			{} // Wait TXE
+			regs()->DR = data[idx];
 		}
+
+		wait_idle();
+
+		// Back to 8-bit mode
+		regs()->CR1 &= ~(1U << 6);	// Disable SPE
+		regs()->CR1 &= ~(1U << 11); // DFF: 8-bit
+		regs()->CR1 |= (1U << 6);	// Enable SPE
 	}
 
 	static constexpr bool has_dma = false; // TODO: add DMA support

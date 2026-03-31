@@ -47,16 +47,20 @@ template <typename BoardConfig> class Application
 
 	Scheduler& scheduler() { return scheduler_; }
 	BoardConfig& board() { return board_; }
+	const PerfStats& perf() const { return perf_; }
 
   private:
 	BoardConfig& board_;
 	Scheduler scheduler_;
 	ui::Screen* active_screen_ = nullptr;
 	gfx::DirtyManager dirty_;
+	PerfStats perf_{};
 
 	// Track touch state for press/release detection
 	bool was_touching_ = false;
 	Point last_touch_pos_{};
+	TickMs last_release_tick_			= 0;
+	static constexpr TickMs DEBOUNCE_MS = 100;
 
 	/// Input task — polls touch and dispatches events.
 	class InputTaskImpl : public Task
@@ -97,21 +101,24 @@ template <typename BoardConfig> class Application
 		hal::TouchPoint tp;
 		if (board_.touch.poll(tp))
 		{
+			TickMs now = board_.tick.now();
 			if (tp.pressed && !was_touching_)
 			{
-				// Press
-				ui::TouchEvent event{ui::TouchEvent::Type::Press, tp.pos};
-				active_screen_->on_touch(event);
+				// Debounce: ignore presses too soon after release
+				if (now - last_release_tick_ >= DEBOUNCE_MS)
+				{
+					ui::TouchEvent event{ui::TouchEvent::Type::Press, tp.pos};
+					active_screen_->on_touch(event);
+				}
 			}
 			else if (!tp.pressed && was_touching_)
 			{
-				// Release
 				ui::TouchEvent event{ui::TouchEvent::Type::Release, last_touch_pos_};
 				active_screen_->on_touch(event);
+				last_release_tick_ = now;
 			}
 			else if (tp.pressed)
 			{
-				// Move
 				ui::TouchEvent event{ui::TouchEvent::Type::Move, tp.pos};
 				active_screen_->on_touch(event);
 			}
@@ -125,6 +132,18 @@ template <typename BoardConfig> class Application
 		if (!active_screen_)
 			return;
 
+		TickMs frame_start = board_.tick.now();
+
+		// Update FPS counter (counts all frames, not just rendered ones)
+		perf_.frame_count++;
+		perf_.fps_frame_count_++;
+		if (frame_start - perf_.fps_last_tick_ >= 1000)
+		{
+			perf_.fps			   = static_cast<uint16_t>(perf_.fps_frame_count_);
+			perf_.fps_frame_count_ = 0;
+			perf_.fps_last_tick_   = frame_start;
+		}
+
 		// Update model
 		active_screen_->update_model();
 
@@ -133,6 +152,8 @@ template <typename BoardConfig> class Application
 
 		if (!dirty_.has_dirty())
 			return;
+
+		TickMs render_start = board_.tick.now();
 
 		// Render — adapt to boards with or without framebuffer
 		using PF				  = typename BoardConfig::PixFmt;
@@ -194,6 +215,11 @@ template <typename BoardConfig> class Application
 		}
 
 		dirty_.clear();
+
+		// Update perf stats
+		TickMs now			 = board_.tick.now();
+		perf_.render_time_ms = now - render_start;
+		perf_.frame_time_ms	 = now - frame_start;
 	}
 
 	void collect_dirty(ui::Widget& widget)
