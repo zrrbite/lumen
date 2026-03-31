@@ -59,8 +59,6 @@ template <typename BoardConfig> class Application
 	// Track touch state for press/release detection
 	bool was_touching_ = false;
 	Point last_touch_pos_{};
-	TickMs last_release_tick_			= 0;
-	static constexpr TickMs DEBOUNCE_MS = 100;
 
 	/// Input task — polls touch and dispatches events.
 	class InputTaskImpl : public Task
@@ -101,21 +99,15 @@ template <typename BoardConfig> class Application
 		hal::TouchPoint tp;
 		if (board_.touch.poll(tp))
 		{
-			TickMs now = board_.tick.now();
 			if (tp.pressed && !was_touching_)
 			{
-				// Debounce: ignore presses too soon after release
-				if (now - last_release_tick_ >= DEBOUNCE_MS)
-				{
-					ui::TouchEvent event{ui::TouchEvent::Type::Press, tp.pos};
-					active_screen_->on_touch(event);
-				}
+				ui::TouchEvent event{ui::TouchEvent::Type::Press, tp.pos};
+				active_screen_->on_touch(event);
 			}
 			else if (!tp.pressed && was_touching_)
 			{
 				ui::TouchEvent event{ui::TouchEvent::Type::Release, last_touch_pos_};
 				active_screen_->on_touch(event);
-				last_release_tick_ = now;
 			}
 			else if (tp.pressed)
 			{

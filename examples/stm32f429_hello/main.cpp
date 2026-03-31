@@ -102,6 +102,8 @@ class HelloScreen : public lumen::ui::Screen
 		int_to_str(buf, "Touches: ", touch_count);
 		counter_.set_text(buf);
 		bar_.set_value(bar_value);
+		btn_.tick_visual();
+		reset_btn_.tick_visual();
 
 		if (g_app)
 		{

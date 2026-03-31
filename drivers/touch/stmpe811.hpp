@@ -71,16 +71,19 @@ template <typename I2cDrv> class Stmpe811
 
 	bool poll(hal::TouchPoint& out)
 	{
-		// Check FIFO level for touch data (ST BSP approach)
-		uint8_t fifo_level = I2cDrv::read_reg(ADDR, 0x4C); // FIFO_SIZE
+		// Use TOUCH_DET (TSC_CTRL bit 7) for finger presence —
+		// stays set as long as finger is on screen, unlike FIFO
+		// which can briefly empty between ADC conversions.
+		uint8_t tsc_ctrl = I2cDrv::read_reg(ADDR, 0x40); // TSC_CTRL
+		bool touching	 = (tsc_ctrl & (1U << 7)) != 0;
 
+		// Read position from FIFO if data available
+		uint8_t fifo_level = I2cDrv::read_reg(ADDR, 0x4C); // FIFO_SIZE
 		if (fifo_level > 0)
 		{
-			// Read XY data from FIFO (3 bytes, non-incrementing)
 			uint8_t data[3];
 			I2cDrv::read_reg_multi(ADDR, 0xD7, data, 3); // TSC_DATA_NON_INC
 
-			// Unpack: X = data[0..1] bits [23:12], Y = data[1..2] bits [11:0]
 			uint32_t raw = (static_cast<uint32_t>(data[0]) << 16) | (static_cast<uint32_t>(data[1]) << 8) |
 						   static_cast<uint32_t>(data[2]);
 			uint16_t raw_x = (raw >> 12) & 0xFFF;
@@ -91,7 +94,6 @@ template <typename I2cDrv> class Stmpe811
 			int16_t px = static_cast<int16_t>((raw_x * 240) / 4096);
 			int16_t py = static_cast<int16_t>(320 - (raw_y * 320) / 4096);
 
-			// Clamp
 			if (px < 0)
 				px = 0;
 			if (px > 239)
@@ -101,26 +103,38 @@ template <typename I2cDrv> class Stmpe811
 			if (py > 319)
 				py = 319;
 
-			out.pos		 = {px, py};
-			out.pressed	 = true;
-			out.pressure = 128;
-
-			was_pressed_ = true;
-			last_pos_	 = out.pos;
+			last_pos_ = {px, py};
 
 			// Reset FIFO
 			I2cDrv::write_reg(ADDR, 0x4B, 0x01);
 			I2cDrv::write_reg(ADDR, 0x4B, 0x00);
+		}
 
+		if (touching)
+		{
+			if (!was_pressed_)
+			{
+				// New press
+				was_pressed_ = true;
+				out.pos		 = last_pos_;
+				out.pressed	 = true;
+				out.pressure = 128;
+				return true;
+			}
+			// Still touching — report as move with updated position
+			out.pos		 = last_pos_;
+			out.pressed	 = true;
+			out.pressure = 128;
 			return true;
 		}
 
 		if (was_pressed_)
 		{
+			// Finger lifted
+			was_pressed_ = false;
 			out.pos		 = last_pos_;
 			out.pressed	 = false;
 			out.pressure = 0;
-			was_pressed_ = false;
 			return true;
 		}
 
