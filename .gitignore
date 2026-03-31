@@ -2,3 +2,4 @@ build/
 build-*/
 *.vsix
 node_modules/
+.cache/
