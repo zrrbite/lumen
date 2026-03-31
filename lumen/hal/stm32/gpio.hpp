@@ -7,7 +7,7 @@
 
 namespace lumen::hal::stm32 {
 
-/// GPIO port base addresses (STM32F4)
+/// GPIO port base addresses (STM32F4/F7)
 enum class Port : uint32_t
 {
 	A = 0x40020000,
@@ -17,6 +17,10 @@ enum class Port : uint32_t
 	E = 0x40021000,
 	F = 0x40021400,
 	G = 0x40021800,
+	H = 0x40021C00,
+	I = 0x40022000,
+	J = 0x40022400,
+	K = 0x40022800,
 };
 
 /// GPIO register offsets

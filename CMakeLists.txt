@@ -61,3 +61,15 @@ if(CMAKE_CROSSCOMPILING AND LUMEN_TARGET_F429)
         COMMENT "Generating .bin, showing size"
     )
 endif()
+
+# STM32F769 platform (cross-compilation only)
+if(CMAKE_CROSSCOMPILING AND LUMEN_TARGET_F769)
+    add_subdirectory(platform/stm32f769_disco)
+    add_executable(stm32f769_hello examples/stm32f769_hello/main.cpp)
+    target_link_libraries(stm32f769_hello PRIVATE stm32f769_disco)
+    add_custom_command(TARGET stm32f769_hello POST_BUILD
+        COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:stm32f769_hello> stm32f769_hello.bin
+        COMMAND ${CMAKE_SIZE} $<TARGET_FILE:stm32f769_hello>
+        COMMENT "Generating .bin, showing size"
+    )
+endif()
