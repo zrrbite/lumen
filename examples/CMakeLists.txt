@@ -1,3 +1,4 @@
 if(LUMEN_BUILD_SIMULATOR)
     add_subdirectory(hello_rectangle)
+    add_subdirectory(hello_button)
 endif()
