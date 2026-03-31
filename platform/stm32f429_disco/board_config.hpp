@@ -15,7 +15,6 @@
 #include "drivers/touch/stmpe811.hpp"
 #include "lumen/hal/input_driver.hpp"
 #include "lumen/hal/os/bare_metal.hpp"
-#include "lumen/hal/stm32/dma2d.hpp"
 #include "lumen/hal/stm32/gpio.hpp"
 #include "lumen/hal/stm32/i2c.hpp"
 #include "lumen/hal/stm32/spi.hpp"
@@ -89,15 +88,27 @@ struct Stm32f429DiscoConfig
 		LCD_DCX::init_output();
 		LCD_RST::init_output();
 
+		// I2C bus recovery: if SDA is stuck low from a previous
+		// interrupted transfer, clock SCL to release it
+		I2C3_SCL::init_output();
+		I2C3_SDA::init_af_od(4); // Read SDA as open-drain input
+		for (int i = 0; i < 16; ++i)
+		{
+			I2C3_SCL::low();
+			for (volatile int d = 0; d < 100; ++d)
+			{}
+			I2C3_SCL::high();
+			for (volatile int d = 0; d < 100; ++d)
+			{}
+		}
+
 		// I2C3 pins (AF4, open-drain for I2C)
 		I2C3_SCL::init_af_od(4);
 		I2C3_SDA::init_af_od(4);
 
 		// Init peripherals
 		SPI5Drv::init_master(2); // ~11MHz (APB2=90MHz / 8)
-		SPI5Drv::enable_dma_clock();
 		I2C3Drv::init();
-		Dma2d::enable_clock();
 
 		// Init drivers
 		display.init();

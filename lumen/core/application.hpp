@@ -168,13 +168,14 @@ template <typename BoardConfig> class Application
 		else
 		{
 			// Direct-to-display mode (SPI TFT, no framebuffer)
-			// Render in horizontal bands using scratch buffer
+			// Render line-by-line using scratch buffer
 			static constexpr size_t scratch_pixels = BoardConfig::scratch_buffer_size / sizeof(pixel_t);
 			static pixel_t scratch[scratch_pixels];
 
 			for (uint8_t d = 0; d < dirty_.count(); ++d)
 			{
-				Rect dirty		= dirty_.rect(d);
+				Rect dirty = dirty_.rect(d);
+				// Render in horizontal bands that fit the scratch buffer
 				uint16_t band_h = scratch_pixels / dirty.w;
 				if (band_h == 0)
 					band_h = 1;
@@ -185,12 +186,15 @@ template <typename BoardConfig> class Application
 					if (band_y + h > dirty.bottom())
 						h = dirty.bottom() - band_y;
 
+					// Clear scratch buffer
 					uint32_t band_pixels = static_cast<uint32_t>(dirty.w) * h;
 					for (uint32_t p = 0; p < band_pixels; ++p)
 						scratch[p] = 0;
 
 					Rect band{dirty.x, band_y, dirty.w, h};
 					gfx::Canvas<PF> canvas(scratch, dirty.w, h);
+					// Set origin so widgets drawing in screen coordinates
+					// map correctly into the scratch buffer
 					canvas.set_origin(dirty.x, band_y);
 					canvas.set_clip(band);
 

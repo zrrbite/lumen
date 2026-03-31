@@ -73,11 +73,6 @@ template <uint16_t W, uint16_t H, typename PixFmt = Rgb565> class Sdl2Display
 		}
 	}
 
-	/// DMA stubs for desktop — just forward to blocking write.
-	void write_pixels_dma(const pixel_t* data, uint32_t count) { write_pixels(data, count); }
-	void write_pixels_dma_wait() {}
-	bool dma_busy() const { return false; }
-
 	/// Push framebuffer to screen.
 	void flush()
 	{
