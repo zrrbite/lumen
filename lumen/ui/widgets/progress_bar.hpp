@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lumen/core/pixel_format.hpp"
 #include "lumen/ui/widget.hpp"
 
 namespace lumen::ui {
@@ -29,7 +30,7 @@ class ProgressBar : public Widget
 		invalidate();
 	}
 
-	void draw(gfx::Canvas<Rgb565>& canvas) override
+	void draw(gfx::Canvas<ActivePixFmt>& canvas) override
 	{
 		// Background
 		canvas.fill_rect(bounds(), Color::rgb(50, 50, 60));

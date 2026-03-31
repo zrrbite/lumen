@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "lumen/core/pixel_format.hpp"
 #include "lumen/gfx/sdf_font.hpp"
 #include "lumen/ui/widget.hpp"
 
@@ -43,7 +44,7 @@ class SdfLabel : public Widget
 		invalidate();
 	}
 
-	void draw(gfx::Canvas<Rgb565>& canvas) override
+	void draw(gfx::Canvas<ActivePixFmt>& canvas) override
 	{
 		canvas.fill_rect(bounds(), bg_color_);
 

@@ -16,7 +16,7 @@
 #include "lumen/ui/widgets/button.hpp"
 #include "lumen/ui/widgets/label.hpp"
 #include "lumen/ui/widgets/progress_bar.hpp"
-#include "lumen/ui/widgets/sdf_label.hpp"
+// SdfLabel no longer needed — Label now supports both bitmap and SDF fonts
 #include "platform/stm32f429_disco/board_config.hpp"
 
 using Board	  = lumen::platform::Stm32f429DiscoConfig;
@@ -75,8 +75,7 @@ class HelloScreen : public lumen::ui::Screen
 	{
 		title_.set_text("Lumen SDF!");
 		title_.set_bounds({10, 4, 220, 28});
-		title_.set_font(&lumen::gfx::liberation_sans_sdf16);
-		title_.set_target_size(20); // Render 16px SDF at 20px
+		title_.set_font(&lumen::gfx::liberation_sans_sdf16, 20); // SDF at 20px
 		title_.set_color(lumen::Color::rgb(100, 200, 255));
 		title_.set_bg_color(lumen::Color::rgb(20, 20, 30));
 
@@ -144,7 +143,7 @@ class HelloScreen : public lumen::ui::Screen
 		add(status_);
 
 		// Register widgets for live reload
-		// title_ is SdfLabel, not in registry yet
+		registry.add("title", title_);
 		registry.add("counter", counter_);
 		registry.add("btn", btn_);
 		registry.add("reset", reset_btn_);
@@ -195,7 +194,7 @@ class HelloScreen : public lumen::ui::Screen
 		}
 	}
 
-	lumen::ui::SdfLabel title_;
+	lumen::ui::Label title_;
 	lumen::ui::Label counter_;
 	lumen::ui::Button btn_;
 	lumen::ui::Button reset_btn_;

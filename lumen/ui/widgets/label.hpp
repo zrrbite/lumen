@@ -2,12 +2,12 @@
 
 #include <cstring>
 
-#include "lumen/gfx/font.hpp"
+#include "lumen/gfx/font_face.hpp"
 #include "lumen/ui/widget.hpp"
 
 namespace lumen::ui {
 
-/// A text label with real bitmap font rendering.
+/// A text label supporting both bitmap and SDF fonts via FontFace.
 class Label : public Widget
 {
   public:
@@ -38,17 +38,20 @@ class Label : public Widget
 		invalidate();
 	}
 
-	void set_font(const gfx::BitmapFont* font) { font_ = font; }
+	/// Set a bitmap font.
+	void set_font(const gfx::BitmapFont* font) { font_ = gfx::FontFace(font); }
 
-	void draw(gfx::Canvas<Rgb565>& canvas) override
+	/// Set an SDF font with target render size.
+	void set_font(const gfx::SdfFont* font, uint16_t target_size = 14) { font_ = gfx::FontFace(font, target_size); }
+
+	void draw(gfx::Canvas<ActivePixFmt>& canvas) override
 	{
 		canvas.fill_rect(bounds(), bg_color_);
 
-		if (font_ && text_[0] != '\0')
+		if (font_.is_valid() && text_[0] != '\0')
 		{
-			// Center text vertically
-			int16_t text_y = bounds().y + (bounds().h - font_->char_height) / 2;
-			font_->draw_string(canvas, static_cast<int16_t>(bounds().x + 4), text_y, text_, fg_color_);
+			int16_t text_y = bounds().y + (bounds().h - font_.height()) / 2;
+			font_.draw_string(canvas, static_cast<int16_t>(bounds().x + 4), text_y, text_, fg_color_);
 		}
 	}
 
@@ -57,7 +60,7 @@ class Label : public Widget
 	char text_[MAX_TEXT]			 = "";
 	Color fg_color_					 = Color::white();
 	Color bg_color_					 = Color::rgb(40, 40, 50);
-	const gfx::BitmapFont* font_	 = &gfx::font_6x8;
+	gfx::FontFace font_{&gfx::font_6x8};
 };
 
 } // namespace lumen::ui

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lumen/core/pixel_format.hpp"
 #include "lumen/ui/widget.hpp"
 
 namespace lumen::ui {
@@ -40,7 +41,7 @@ class Toggle : public Widget
 		return false;
 	}
 
-	void draw(gfx::Canvas<Rgb565>& canvas) override
+	void draw(gfx::Canvas<ActivePixFmt>& canvas) override
 	{
 		// Track
 		Color track_color = on_ ? Color::rgb(50, 160, 80) : Color::rgb(80, 80, 90);

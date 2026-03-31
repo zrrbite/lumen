@@ -2,7 +2,8 @@
 
 #include <cstring>
 
-#include "lumen/gfx/font.hpp"
+#include "lumen/core/pixel_format.hpp"
+#include "lumen/gfx/font_face.hpp"
 #include "lumen/ui/widget.hpp"
 
 namespace lumen::ui {
@@ -32,7 +33,8 @@ class Button : public Widget
 		invalidate();
 	}
 
-	void set_font(const gfx::BitmapFont* font) { font_ = font; }
+	void set_font(const gfx::BitmapFont* font) { font_ = gfx::FontFace(font); }
+	void set_font(const gfx::SdfFont* font, uint16_t size = 14) { font_ = gfx::FontFace(font, size); }
 	void set_on_click(ButtonCallback callback) { on_click_ = callback; }
 
 	bool on_touch(const TouchEvent& event) override
@@ -78,19 +80,19 @@ class Button : public Widget
 		}
 	}
 
-	void draw(gfx::Canvas<Rgb565>& canvas) override
+	void draw(gfx::Canvas<ActivePixFmt>& canvas) override
 	{
 		Color bg = is_pressed() ? pressed_color_ : normal_color_;
 		canvas.fill_rect(bounds(), bg);
 		canvas.draw_rect(bounds(), Color::white());
 
 		// Render text centered
-		if (font_ && label_[0] != '\0')
+		if (font_.is_valid() && label_[0] != '\0')
 		{
-			uint16_t text_w = font_->string_width(label_);
+			uint16_t text_w = font_.string_width(label_);
 			int16_t text_x	= bounds().x + (bounds().w - text_w) / 2;
-			int16_t text_y	= bounds().y + (bounds().h - font_->char_height) / 2;
-			font_->draw_string(canvas, text_x, text_y, label_, Color::white());
+			int16_t text_y	= bounds().y + (bounds().h - font_.height()) / 2;
+			font_.draw_string(canvas, text_x, text_y, label_, Color::white());
 		}
 	}
 
@@ -104,7 +106,7 @@ class Button : public Widget
 	bool pressed_							   = false;
 	bool awaiting_release_					   = false;
 	uint8_t press_visual_timer_				   = 0;
-	const gfx::BitmapFont* font_			   = &gfx::font_6x8;
+	gfx::FontFace font_{&gfx::font_6x8};
 };
 
 } // namespace lumen::ui

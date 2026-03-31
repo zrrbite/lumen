@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lumen/core/pixel_format.hpp"
 #include "lumen/ui/widget.hpp"
 
 namespace lumen::ui {
@@ -40,7 +41,7 @@ class Checkbox : public Widget
 		return false;
 	}
 
-	void draw(gfx::Canvas<Rgb565>& canvas) override
+	void draw(gfx::Canvas<ActivePixFmt>& canvas) override
 	{
 		Color bg	 = checked_ ? Color::rgb(50, 160, 80) : Color::rgb(60, 60, 70);
 		Color border = checked_ ? Color::rgb(70, 180, 100) : Color::rgb(100, 100, 110);

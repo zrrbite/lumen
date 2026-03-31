@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lumen/core/pixel_format.hpp"
 #include "lumen/core/types.hpp"
 #include "lumen/gfx/canvas.hpp"
 #include "lumen/hal/touch_driver.hpp"
@@ -18,6 +19,15 @@ struct TouchEvent
 
 	Type type;
 	Point pos; // In screen coordinates
+};
+
+/// Input event types for keyboard/encoder input.
+enum class InputAction : uint8_t
+{
+	FocusNext, // Tab / encoder clockwise
+	FocusPrev, // Shift-tab / encoder counter-clockwise
+	Activate,  // Enter / encoder press
+	Back,	   // Escape / back button
 };
 
 /// Base class for all visible UI elements.
@@ -39,8 +49,8 @@ class Widget
 	}
 
 	// --- Rendering ---
-	/// Draw this widget into the canvas. Canvas is clipped to the dirty region.
-	virtual void draw(gfx::Canvas<Rgb565>& canvas) = 0;
+	/// Draw this widget into the canvas.
+	virtual void draw(gfx::Canvas<ActivePixFmt>& canvas) = 0;
 
 	// --- Dirty tracking ---
 	void invalidate() { dirty_ = true; }
@@ -50,6 +60,22 @@ class Widget
 	// --- Input ---
 	/// Handle a touch event. Return true if consumed.
 	virtual bool on_touch(const TouchEvent& /*event*/) { return false; }
+
+	/// Handle an input action (keyboard/encoder). Return true if consumed.
+	virtual bool on_input(InputAction /*action*/) { return false; }
+
+	// --- Focus ---
+	bool is_focusable() const { return focusable_; }
+	void set_focusable(bool f) { focusable_ = f; }
+	bool is_focused() const { return focused_; }
+	void set_focused(bool f)
+	{
+		if (f != focused_)
+		{
+			focused_ = f;
+			invalidate();
+		}
+	}
 
 	// --- Hierarchy ---
 	Widget* parent() const { return parent_; }
@@ -73,6 +99,8 @@ class Widget
 	Widget* parent_ = nullptr;
 	bool dirty_		= true;
 	bool visible_	= true;
+	bool focusable_ = false;
+	bool focused_	= false;
 
 	friend class Container;
 };
