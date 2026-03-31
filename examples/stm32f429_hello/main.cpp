@@ -4,8 +4,7 @@
 #include "lumen/core/application.hpp"
 #include "lumen/gfx/fonts/liberation_sans_10.hpp"
 #include "lumen/gfx/fonts/liberation_sans_14.hpp"
-#include "lumen/gfx/fonts/liberation_sans_20.hpp"
-#include "lumen/gfx/fonts/liberation_sans_bold_14.hpp"
+#include "lumen/gfx/fonts/liberation_sans_bold_10.hpp"
 #include "lumen/ui/animation.hpp"
 #include "lumen/ui/screen.hpp"
 #include "lumen/ui/widgets/button.hpp"
@@ -60,18 +59,18 @@ class HelloScreen : public lumen::ui::Screen
 	{
 		title_.set_text("Lumen on STM32!");
 		title_.set_bounds({10, 8, 220, 24});
-		title_.set_font(&lumen::gfx::liberation_sans_20);
+		title_.set_font(&lumen::gfx::liberation_sans_14);
 		title_.set_color(lumen::Color::rgb(100, 200, 255));
 		title_.set_bg_color(lumen::Color::rgb(20, 20, 30));
 
 		counter_.set_text("Touches: 0");
 		counter_.set_bounds({10, 38, 220, 20});
-		counter_.set_font(&lumen::gfx::liberation_sans_14);
+		counter_.set_font(&lumen::gfx::liberation_sans_10);
 		counter_.set_bg_color(lumen::Color::rgb(20, 20, 30));
 
 		btn_.set_label("Touch Me!");
 		btn_.set_bounds({20, 70, 200, 60});
-		btn_.set_font(&lumen::gfx::liberation_sans_bold_14);
+		btn_.set_font(&lumen::gfx::liberation_sans_bold_10);
 		btn_.set_on_click([] {
 			++touch_count;
 			bar_target += 10.0f;
@@ -92,7 +91,7 @@ class HelloScreen : public lumen::ui::Screen
 
 		reset_btn_.set_label("Reset");
 		reset_btn_.set_bounds({20, 145, 200, 50});
-		reset_btn_.set_font(&lumen::gfx::liberation_sans_bold_14);
+		reset_btn_.set_font(&lumen::gfx::liberation_sans_bold_10);
 		reset_btn_.set_color(lumen::Color::rgb(180, 60, 60), lumen::Color::rgb(120, 40, 40));
 		reset_btn_.set_on_click([] {
 			touch_count = 0;
@@ -116,7 +115,7 @@ class HelloScreen : public lumen::ui::Screen
 
 		status_.set_text("Touch the buttons!");
 		status_.set_bounds({10, 270, 220, 20});
-		status_.set_font(&lumen::gfx::liberation_sans_14);
+		status_.set_font(&lumen::gfx::liberation_sans_10);
 		status_.set_color(lumen::Color::rgb(150, 150, 160));
 		status_.set_bg_color(lumen::Color::rgb(20, 20, 30));
 

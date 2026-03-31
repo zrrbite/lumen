@@ -66,6 +66,41 @@ struct MyBoard {
 };
 ```
 
+## Font & Image Pipeline
+
+Generate bitmap fonts from TTF files using `lumen-tools`:
+
+```bash
+cd tools && cargo build --release
+# Generate fonts at multiple sizes
+./target/release/lumen-tools font /path/to/Font.ttf --sizes 10,14,20 --output ../lumen/gfx/fonts
+# Generate with custom name prefix
+./target/release/lumen-tools font Font.ttf --sizes 12 --name my_font --output ../lumen/gfx/fonts
+# Convert PNG to C++ header (RGB565 for embedded)
+./target/release/lumen-tools image icon.png --output ../assets/icon.hpp
+```
+
+Generated font headers go in `lumen/gfx/fonts/` and produce `BitmapFont` instances:
+```cpp
+#include "lumen/gfx/fonts/liberation_sans_14.hpp"
+label.set_font(&lumen::gfx::liberation_sans_14);
+```
+
+Built-in fonts: `font_6x8` (6x8 monospace, 760 bytes — always available).
+
+## Animation System
+
+```cpp
+#include "lumen/ui/animation.hpp"
+lumen::ui::AnimationManager anim;
+// Animate a float from current value to target over 300ms with easing
+anim.animate(&my_value, from, to, 300, tick.now(), lumen::ui::ease::out_cubic);
+// Tick in update_model()
+anim.update(tick.now());
+```
+
+Easing functions: `linear`, `in_quad`, `out_quad`, `in_out_quad`, `in_cubic`, `out_cubic`, `in_out_cubic`, `in_expo`, `out_expo`, `out_back`, `out_bounce`.
+
 ## Code Style
 
 - C++17, no exceptions, no RTTI on embedded

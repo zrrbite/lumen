@@ -126,6 +126,11 @@ extern "C" void Reset_Handler()
 		*dst++ = 0;
 	}
 
+	// Enable FPU (Cortex-M4 with FPv4-SP)
+	// Set CP10 and CP11 to full access in CPACR
+	volatile uint32_t* cpacr = reinterpret_cast<volatile uint32_t*>(0xE000ED88);
+	*cpacr |= (0xFU << 20); // CP10 + CP11 = full access
+
 	// Configure clocks
 	system_clock_config();
 
