@@ -306,7 +306,8 @@ int main()
 	r(D, 0xC8) = 0; // IER[1]
 
 	// 4. HAL_DSI_ConfigVideoMode equivalent
-	r(D, 0x34) &= ~1U; // MCR: video mode (clear CMDM)
+	r(D, 0x34) &= ~1U;		 // MCR: video mode (clear CMDM)
+	r(D, 0x400) = (5U << 1); // WCFGR: video mode (DSIM=0) + COLMUX=5 (RGB888)
 	r(D, 0x38) =
 		(2U << 0) | (1U << 8) | (1U << 9) | (1U << 10) | (1U << 11) | (1U << 12) | (1U << 13) | (1U << 15); // VMCR
 	r(D, 0x3C)			  = 800;																			// VPCR
@@ -348,34 +349,33 @@ int main()
 	r(L, 0x24) = 1; // SRCR
 
 	// 6. HAL_DSI_Start
-	r(D, 0x04)	= 1;					 // CR: enable host
-	r(D, 0x404) = (1U << 2) | (1U << 3); // WCR: LTDCEN + DSIEN
+	r(D, 0x04)	= 1;		 // CR: enable host
+	r(D, 0x404) = (1U << 3); // WCR: DSIEN only (HAL_DSI_Start)
 
 	delay(10);
 
-	// 7. Fill framebuffer before layer config
+	// 7. Fill framebuffer
 	volatile uint32_t* fb = reinterpret_cast<volatile uint32_t*>(FB);
 	for (uint32_t i = 0; i < 800 * 480; ++i)
-		fb[i] = 0xFFFF0000; // Red ARGB
+		fb[i] = 0xFFFF0000;
 
-	// 8. Layer config (BSP does this AFTER DSI_Start)
-	uint32_t hs = HSA + HBP, vs = VSA + VBP;
+	// 8. Layer config
+	constexpr uint32_t hs = HSA + HBP, vs = VSA + VBP;
 	r(L, 0x88) = (hs) | ((hs + HACT - 1) << 16);
 	r(L, 0x8C) = (vs) | ((vs + VACT - 1) << 16);
-	r(L, 0x94) = 0; // ARGB8888
+	r(L, 0x94) = 0;
 	r(L, 0x98) = 255;
 	r(L, 0x9C) = 0;
 	r(L, 0xA0) = (6U) | (4U << 8);
 	r(L, 0xAC) = FB;
-	r(L, 0xB0) = (3200U << 16) | 3203U; // pitch=3200, line=3203
+	r(L, 0xB0) = (3200U << 16) | 3203U;
 	r(L, 0xB4) = 480;
-	r(L, 0x84) = 1; // Enable layer
-	r(L, 0x24) = 1; // SRCR: reload
+	r(L, 0x84) = 1;
+	r(L, 0x24) = 1;
 
-	// 9. OTM8009A init
+	// 9. OTM8009A
 	otm_init();
 
-	// Done
 	LD1::low();
 	while (true)
 	{
