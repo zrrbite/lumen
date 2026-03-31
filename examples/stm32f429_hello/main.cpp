@@ -1,26 +1,37 @@
 /// Lumen interactive demo on STM32F429-DISCO.
-/// Touch the buttons! Uses ILI9341 display + STMPE811 touch.
+/// Touch the buttons! Live-reload over UART (115200 8N1).
+/// Connect to ST-LINK VCP and send: SET title.text New Title
 
 #include "lumen/core/application.hpp"
 #include "lumen/gfx/fonts/liberation_sans_10.hpp"
 #include "lumen/gfx/fonts/liberation_sans_14.hpp"
 #include "lumen/gfx/fonts/liberation_sans_bold_10.hpp"
+#include "lumen/hal/stm32/gpio.hpp"
+#include "lumen/hal/stm32/uart.hpp"
 #include "lumen/ui/animation.hpp"
+#include "lumen/ui/live_reload.hpp"
 #include "lumen/ui/screen.hpp"
+#include "lumen/ui/widget_registry.hpp"
 #include "lumen/ui/widgets/button.hpp"
 #include "lumen/ui/widgets/label.hpp"
 #include "lumen/ui/widgets/progress_bar.hpp"
 #include "platform/stm32f429_disco/board_config.hpp"
 
-using Board = lumen::platform::Stm32f429DiscoConfig;
-using App	= lumen::Application<Board>;
+using Board	  = lumen::platform::Stm32f429DiscoConfig;
+using App	  = lumen::Application<Board>;
+using Usart1  = lumen::hal::stm32::Usart<lumen::hal::stm32::UsartInstance::USART1>;
+using UART_TX = lumen::hal::stm32::GpioPin<lumen::hal::stm32::Port::A, 9>;
+using UART_RX = lumen::hal::stm32::GpioPin<lumen::hal::stm32::Port::A, 10>;
 
 static int touch_count	= 0;
 static float bar_target = 0.0f;
 static App* g_app		= nullptr;
 
-// Animated value for smooth progress bar
 static float bar_animated = 0.0f;
+
+static lumen::ui::AnimationManager anim;
+static lumen::ui::WidgetRegistry registry;
+static lumen::ui::LiveReload* g_live = nullptr;
 
 // Simple int-to-string (no snprintf, no newlib locks)
 static void int_to_str(char* buf, const char* prefix, int val)
@@ -50,7 +61,10 @@ static void int_to_str(char* buf, const char* prefix, int val)
 	*buf = '\0';
 }
 
-static lumen::ui::AnimationManager anim;
+static void uart_respond(const char* text)
+{
+	Usart1::send_string(text);
+}
 
 class HelloScreen : public lumen::ui::Screen
 {
@@ -76,7 +90,6 @@ class HelloScreen : public lumen::ui::Screen
 			bar_target += 10.0f;
 			if (bar_target > 100.0f)
 				bar_target = 0.0f;
-			// Animate progress bar smoothly
 			if (g_app)
 			{
 				anim.cancel_target(&bar_animated);
@@ -113,7 +126,7 @@ class HelloScreen : public lumen::ui::Screen
 		perf_.set_color(lumen::Color::rgb(100, 100, 120));
 		perf_.set_bg_color(lumen::Color::rgb(20, 20, 30));
 
-		status_.set_text("Touch the buttons!");
+		status_.set_text("UART: 115200 8N1");
 		status_.set_bounds({10, 270, 220, 20});
 		status_.set_font(&lumen::gfx::liberation_sans_10);
 		status_.set_color(lumen::Color::rgb(150, 150, 160));
@@ -126,6 +139,15 @@ class HelloScreen : public lumen::ui::Screen
 		add(bar_);
 		add(perf_);
 		add(status_);
+
+		// Register widgets for live reload
+		registry.add("title", title_);
+		registry.add("counter", counter_);
+		registry.add("btn", btn_);
+		registry.add("reset", reset_btn_);
+		registry.add("bar", bar_);
+		registry.add("perf", perf_);
+		registry.add("status", status_);
 	}
 
 	void update_model() override
@@ -136,14 +158,19 @@ class HelloScreen : public lumen::ui::Screen
 		btn_.tick_visual();
 		reset_btn_.tick_visual();
 
-		// Tick animations
 		if (g_app)
-		{
 			anim.update(g_app->board().tick.now());
-		}
 
-		// Update progress bar from animated value
 		bar_.set_value(static_cast<uint8_t>(bar_animated));
+
+		// Poll UART for live reload commands
+		if (g_live)
+		{
+			while (Usart1::rx_available())
+			{
+				g_live->feed(Usart1::receive());
+			}
+		}
 
 		if (g_app)
 		{
@@ -165,7 +192,6 @@ class HelloScreen : public lumen::ui::Screen
 		}
 	}
 
-  private:
 	lumen::ui::Label title_;
 	lumen::ui::Label counter_;
 	lumen::ui::Button btn_;
@@ -180,11 +206,25 @@ int main()
 	Board board;
 	board.init_hardware();
 
+	// Init UART1 for live reload (PA9=TX, PA10=RX, AF7)
+	lumen::hal::stm32::enable_gpio_clock(lumen::hal::stm32::Port::A);
+	UART_TX::init_af(7);
+	UART_RX::init_af(7);
+	Usart1::init(90000000, 115200); // APB2=90MHz
+
+	lumen::ui::LiveReload live(registry);
+	live.set_response_callback(uart_respond);
+	g_live = &live;
+
 	App app(board);
 	g_app = &app;
 
 	HelloScreen screen;
 	app.navigate_to(screen);
+
+	// Send ready message
+	Usart1::send_string("Lumen live reload ready\n");
+
 	app.run();
 
 	return 0;

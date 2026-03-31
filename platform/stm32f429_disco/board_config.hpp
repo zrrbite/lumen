@@ -15,6 +15,7 @@
 #include "drivers/touch/stmpe811.hpp"
 #include "lumen/hal/input_driver.hpp"
 #include "lumen/hal/os/bare_metal.hpp"
+#include "lumen/hal/stm32/dma2d.hpp"
 #include "lumen/hal/stm32/gpio.hpp"
 #include "lumen/hal/stm32/i2c.hpp"
 #include "lumen/hal/stm32/spi.hpp"
@@ -64,6 +65,14 @@ struct Stm32f429DiscoConfig
 	static constexpr size_t framebuffer_count	= 0;
 	static constexpr size_t scratch_buffer_size = 4800; // 10 lines × 240px × 2B
 	static constexpr bool use_external_ram		= false;
+	static constexpr bool has_dma2d				= true;
+
+	/// Hardware-accelerated buffer clear via DMA2D.
+	static void hw_fill(uint16_t* buf, uint16_t width, uint16_t height, uint16_t color)
+	{
+		Dma2d::fill_rect(buf, width, {0, 0, width, height}, color, Dma2dPixFmt::RGB565);
+		Dma2d::wait();
+	}
 
 	Display display{delay_ms};
 	Touch touch{delay_ms};
@@ -109,6 +118,7 @@ struct Stm32f429DiscoConfig
 		// Init peripherals
 		SPI5Drv::init_master(2); // ~11MHz (APB2=90MHz / 8)
 		I2C3Drv::init();
+		Dma2d::enable_clock();
 
 		// Init drivers
 		display.init();

@@ -186,10 +186,10 @@ template <typename BoardConfig> class Application
 					if (band_y + h > dirty.bottom())
 						h = dirty.bottom() - band_y;
 
-					// Clear scratch buffer
 					uint32_t band_pixels = static_cast<uint32_t>(dirty.w) * h;
-					for (uint32_t p = 0; p < band_pixels; ++p)
-						scratch[p] = 0;
+
+					// Clear scratch buffer (DMA2D on STM32, CPU loop on desktop)
+					BoardConfig::hw_fill(scratch, dirty.w, h, 0);
 
 					Rect band{dirty.x, band_y, dirty.w, h};
 					gfx::Canvas<PF> canvas(scratch, dirty.w, h);

@@ -24,6 +24,15 @@ template <uint16_t W = 480, uint16_t H = 272> struct DesktopSdl2Config
 	static constexpr size_t framebuffer_count	= 1;
 	static constexpr size_t scratch_buffer_size = 4096;
 	static constexpr bool use_external_ram		= false;
+	static constexpr bool has_dma2d				= false;
+
+	/// Software buffer clear (no DMA2D on desktop).
+	static void hw_fill(uint16_t* buf, uint16_t width, uint16_t height, uint16_t color)
+	{
+		uint32_t count = static_cast<uint32_t>(width) * height;
+		for (uint32_t i = 0; i < count; ++i)
+			buf[i] = color;
+	}
 
 	Display display;
 	Touch touch{display};
