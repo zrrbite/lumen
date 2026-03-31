@@ -6,6 +6,7 @@
 #include "lumen/gfx/fonts/liberation_sans_14.hpp"
 #include "lumen/gfx/fonts/liberation_sans_20.hpp"
 #include "lumen/gfx/fonts/liberation_sans_bold_14.hpp"
+#include "lumen/ui/animation.hpp"
 #include "lumen/ui/screen.hpp"
 #include "lumen/ui/widgets/button.hpp"
 #include "lumen/ui/widgets/label.hpp"
@@ -15,9 +16,12 @@
 using Board = lumen::platform::Stm32f429DiscoConfig;
 using App	= lumen::Application<Board>;
 
-static int touch_count	 = 0;
-static uint8_t bar_value = 0;
-static App* g_app		 = nullptr;
+static int touch_count	= 0;
+static float bar_target = 0.0f;
+static App* g_app		= nullptr;
+
+// Animated value for smooth progress bar
+static float bar_animated = 0.0f;
 
 // Simple int-to-string (no snprintf, no newlib locks)
 static void int_to_str(char* buf, const char* prefix, int val)
@@ -47,6 +51,8 @@ static void int_to_str(char* buf, const char* prefix, int val)
 	*buf = '\0';
 }
 
+static lumen::ui::AnimationManager anim;
+
 class HelloScreen : public lumen::ui::Screen
 {
   public:
@@ -68,9 +74,20 @@ class HelloScreen : public lumen::ui::Screen
 		btn_.set_font(&lumen::gfx::liberation_sans_bold_14);
 		btn_.set_on_click([] {
 			++touch_count;
-			bar_value += 10;
-			if (bar_value > 100)
-				bar_value = 0;
+			bar_target += 10.0f;
+			if (bar_target > 100.0f)
+				bar_target = 0.0f;
+			// Animate progress bar smoothly
+			if (g_app)
+			{
+				anim.cancel_target(&bar_animated);
+				anim.animate(&bar_animated,
+							 bar_animated,
+							 bar_target,
+							 300,
+							 g_app->board().tick.now(),
+							 lumen::ui::ease::out_cubic);
+			}
 		});
 
 		reset_btn_.set_label("Reset");
@@ -79,14 +96,20 @@ class HelloScreen : public lumen::ui::Screen
 		reset_btn_.set_color(lumen::Color::rgb(180, 60, 60), lumen::Color::rgb(120, 40, 40));
 		reset_btn_.set_on_click([] {
 			touch_count = 0;
-			bar_value	= 0;
+			bar_target	= 0.0f;
+			if (g_app)
+			{
+				anim.cancel_target(&bar_animated);
+				anim.animate(
+					&bar_animated, bar_animated, 0.0f, 500, g_app->board().tick.now(), lumen::ui::ease::out_bounce);
+			}
 		});
 
 		bar_.set_bounds({20, 210, 200, 20});
 		bar_.set_fill_color(lumen::Color::rgb(50, 200, 80));
 
 		perf_.set_text("FPS: --");
-		perf_.set_bounds({10, 245, 220, 20});
+		perf_.set_bounds({10, 245, 220, 18});
 		perf_.set_font(&lumen::gfx::liberation_sans_10);
 		perf_.set_color(lumen::Color::rgb(100, 100, 120));
 		perf_.set_bg_color(lumen::Color::rgb(20, 20, 30));
@@ -111,9 +134,17 @@ class HelloScreen : public lumen::ui::Screen
 		char buf[32];
 		int_to_str(buf, "Touches: ", touch_count);
 		counter_.set_text(buf);
-		bar_.set_value(bar_value);
 		btn_.tick_visual();
 		reset_btn_.tick_visual();
+
+		// Tick animations
+		if (g_app)
+		{
+			anim.update(g_app->board().tick.now());
+		}
+
+		// Update progress bar from animated value
+		bar_.set_value(static_cast<uint8_t>(bar_animated));
 
 		if (g_app)
 		{
