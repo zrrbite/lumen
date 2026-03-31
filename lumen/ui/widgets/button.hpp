@@ -2,14 +2,14 @@
 
 #include <cstring>
 
+#include "lumen/gfx/font.hpp"
 #include "lumen/ui/widget.hpp"
 
 namespace lumen::ui {
 
-/// Callback type for button press.
 using ButtonCallback = void (*)();
 
-/// A pressable button with visual feedback.
+/// A pressable button with text and visual feedback.
 class Button : public Widget
 {
   public:
@@ -48,7 +48,7 @@ class Button : public Widget
 			{
 				pressed_ = false;
 				invalidate();
-				if (on_click_)
+				if (on_click_ != nullptr)
 				{
 					on_click_();
 				}
@@ -66,17 +66,13 @@ class Button : public Widget
 		canvas.fill_rect(bounds(), bg);
 		canvas.draw_rect(bounds(), Color::white());
 
-		// Text placeholder
-		uint16_t text_len = static_cast<uint16_t>(std::strlen(label_));
-		if (text_len > 0)
+		// Render text centered
+		if (font_ && label_[0] != '\0')
 		{
-			uint16_t bar_w = text_len * 7;
-			if (bar_w > bounds().w - 8)
-				bar_w = bounds().w - 8;
-			int16_t text_x = bounds().x + (bounds().w - bar_w) / 2;
-			int16_t text_y = bounds().y + bounds().h / 4;
-			Rect text_rect{text_x, text_y, bar_w, static_cast<uint16_t>(bounds().h / 2)};
-			canvas.fill_rect(text_rect, Color::white());
+			uint16_t text_w = font_->string_width(label_);
+			int16_t text_x	= bounds().x + (bounds().w - text_w) / 2;
+			int16_t text_y	= bounds().y + (bounds().h - font_->char_height) / 2;
+			font_->draw_string(canvas, text_x, text_y, label_, Color::white());
 		}
 	}
 
@@ -87,6 +83,7 @@ class Button : public Widget
 	Color pressed_color_			  = Color::rgb(40, 80, 150);
 	ButtonCallback on_click_		  = nullptr;
 	bool pressed_					  = false;
+	const gfx::BitmapFont* font_	  = &gfx::font_6x8;
 };
 
 } // namespace lumen::ui
