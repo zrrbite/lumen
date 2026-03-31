@@ -1,0 +1,190 @@
+use fontdue::{Font, FontSettings};
+use std::fs;
+use std::path::Path;
+
+pub fn convert(
+    input: &str,
+    sizes: &[f32],
+    output_dir: &str,
+    name_prefix: &str,
+    first_char: u8,
+    last_char: u8,
+) -> Result<(), String> {
+    let font_data = fs::read(input).map_err(|e| format!("Failed to read {input}: {e}"))?;
+    let font = Font::from_bytes(font_data, FontSettings::default())
+        .map_err(|e| format!("Failed to parse font: {e}"))?;
+
+    fs::create_dir_all(output_dir)
+        .map_err(|e| format!("Failed to create output directory: {e}"))?;
+
+    let font_name = font
+        .name()
+        .unwrap_or_else(|| "Unknown");
+
+    for &size in sizes {
+        let size_int = size as u32;
+        let var_name = format!("{name_prefix}_{size_int}");
+        let filename = format!("{var_name}.hpp");
+        let out_path = Path::new(output_dir).join(&filename);
+
+        let header = generate_font_header(&font, &font_name, size, &var_name, first_char, last_char);
+        fs::write(&out_path, header)
+            .map_err(|e| format!("Failed to write {}: {e}", out_path.display()))?;
+
+        // Count the data
+        let num_chars = (last_char - first_char + 1) as usize;
+        let metrics = font.rasterize(first_char as char, size);
+        let char_height = metrics.0.height.max(size as usize);
+
+        // Determine max width across all chars for monospace sizing
+        let mut max_width = 0usize;
+        for ch in first_char..=last_char {
+            let (m, _) = font.rasterize(ch as char, size);
+            if m.width > max_width {
+                max_width = m.width;
+            }
+        }
+        let bytes_per_row = (max_width + 7) / 8;
+        let total_bytes = num_chars * char_height * bytes_per_row;
+
+        println!(
+            "  {filename}: {num_chars} glyphs, {max_width}x{char_height}px, {total_bytes} bytes"
+        );
+    }
+
+    println!("Done! Generated {} font file(s)", sizes.len());
+    Ok(())
+}
+
+fn generate_font_header(
+    font: &Font,
+    font_name: &str,
+    size: f32,
+    var_name: &str,
+    first_char: u8,
+    last_char: u8,
+) -> String {
+    let num_chars = (last_char - first_char + 1) as usize;
+
+    // Rasterize all glyphs to find max dimensions
+    let mut max_width = 0usize;
+    let mut max_height = 0usize;
+    let mut glyphs: Vec<(fontdue::Metrics, Vec<u8>)> = Vec::with_capacity(num_chars);
+
+    for ch in first_char..=last_char {
+        let (metrics, bitmap) = font.rasterize(ch as char, size);
+        if metrics.width > max_width {
+            max_width = metrics.width;
+        }
+        if metrics.height > max_height {
+            max_height = metrics.height;
+        }
+        glyphs.push((metrics, bitmap));
+    }
+
+    // Use font metrics for consistent height
+    let line_metrics = font.horizontal_line_metrics(size);
+    let char_height = if let Some(lm) = line_metrics {
+        (lm.ascent - lm.descent).ceil() as usize
+    } else {
+        max_height.max(size as usize)
+    };
+    let char_width = max_width.max(1);
+    let bytes_per_row = (char_width + 7) / 8;
+
+    // Calculate baseline from font metrics
+    let ascent = if let Some(lm) = line_metrics {
+        lm.ascent.ceil() as i32
+    } else {
+        char_height as i32
+    };
+
+    // Pack into 1bpp bitmap data
+    let mut packed_data: Vec<u8> = Vec::new();
+
+    for (metrics, bitmap) in &glyphs {
+        // Position glyph within the cell using baseline alignment
+        let glyph_y_offset = (ascent - metrics.height as i32 - metrics.ymin as i32).max(0) as usize;
+
+        for row in 0..char_height {
+            let mut row_bytes = vec![0u8; bytes_per_row];
+
+            let glyph_row = row as i32 - glyph_y_offset as i32;
+            if glyph_row >= 0 && (glyph_row as usize) < metrics.height {
+                let gr = glyph_row as usize;
+                // Center glyph horizontally for monospace
+                let x_offset = (char_width.saturating_sub(metrics.width)) / 2;
+
+                for col in 0..metrics.width {
+                    let pixel = bitmap[gr * metrics.width + col];
+                    if pixel > 127 {
+                        // threshold at 50%
+                        let dest_col = col + x_offset;
+                        if dest_col < char_width {
+                            let byte_idx = dest_col / 8;
+                            let bit_idx = 7 - (dest_col % 8);
+                            row_bytes[byte_idx] |= 1 << bit_idx;
+                        }
+                    }
+                }
+            }
+
+            packed_data.extend_from_slice(&row_bytes);
+        }
+    }
+
+    // Generate C++ header
+    let size_int = size as u32;
+    let total_bytes = packed_data.len();
+    let guard = var_name.to_uppercase();
+
+    let mut out = String::new();
+    out.push_str(&format!("#pragma once\n\n"));
+    out.push_str(&format!(
+        "/// Auto-generated bitmap font: {font_name} {size_int}px\n"
+    ));
+    out.push_str(&format!(
+        "/// Generated by lumen-tools from {font_name}\n"
+    ));
+    out.push_str(&format!(
+        "/// {num_chars} glyphs ({first_char}..{last_char}), {char_width}x{char_height}px, {total_bytes} bytes\n\n"
+    ));
+    out.push_str("#include <cstdint>\n\n");
+    out.push_str("#include \"lumen/gfx/font.hpp\"\n\n");
+    out.push_str("namespace lumen::gfx {\n\n");
+
+    // Data array
+    out.push_str(&format!(
+        "// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)\n"
+    ));
+    out.push_str(&format!(
+        "static constexpr uint8_t {guard}_DATA[] = {{\n"
+    ));
+
+    for (i, chunk) in packed_data.chunks(16).enumerate() {
+        out.push_str("    ");
+        for (j, byte) in chunk.iter().enumerate() {
+            out.push_str(&format!("0x{byte:02X}"));
+            if i * 16 + j + 1 < total_bytes {
+                out.push_str(", ");
+            }
+        }
+        out.push('\n');
+    }
+
+    out.push_str("};\n\n");
+
+    // BitmapFont instance
+    out.push_str(&format!("inline constexpr BitmapFont {var_name} = {{\n"));
+    out.push_str(&format!("    .data          = {guard}_DATA,\n"));
+    out.push_str(&format!("    .char_width    = {char_width},\n"));
+    out.push_str(&format!("    .char_height   = {char_height},\n"));
+    out.push_str(&format!("    .first_char    = {first_char},\n"));
+    out.push_str(&format!("    .last_char     = {last_char},\n"));
+    out.push_str(&format!("    .bytes_per_row = {bytes_per_row},\n"));
+    out.push_str("};\n\n");
+
+    out.push_str("} // namespace lumen::gfx\n");
+
+    out
+}

@@ -32,6 +32,7 @@ class Button : public Widget
 		invalidate();
 	}
 
+	void set_font(const gfx::BitmapFont* font) { font_ = font; }
 	void set_on_click(ButtonCallback callback) { on_click_ = callback; }
 
 	bool on_touch(const TouchEvent& event) override

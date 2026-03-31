@@ -3,3 +3,4 @@ build-*/
 *.vsix
 node_modules/
 .cache/
+tools/target/
