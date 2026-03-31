@@ -9,7 +9,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(LUMEN_BUILD_EXAMPLES "Build example applications" OFF)
 option(LUMEN_BUILD_SIMULATOR "Build SDL2 desktop simulator" OFF)
 
-# Core library (mostly headers, thin cpp for non-template code)
+# Core library — mostly headers with a small compiled component for font data
+add_library(lumen_core STATIC
+    src/gfx/font_6x8.cpp
+)
+
+target_include_directories(lumen_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_compile_features(lumen_core PUBLIC cxx_std_17)
+
+# Header-only interface for template code
 add_library(lumen INTERFACE)
 
 target_include_directories(lumen INTERFACE
@@ -28,7 +40,7 @@ endif()
 if(LUMEN_BUILD_SIMULATOR)
     find_package(SDL2 REQUIRED)
     add_library(lumen_sim INTERFACE)
-    target_link_libraries(lumen_sim INTERFACE lumen SDL2::SDL2)
+    target_link_libraries(lumen_sim INTERFACE lumen lumen_core SDL2::SDL2)
     target_compile_definitions(lumen_sim INTERFACE LUMEN_PLATFORM_DESKTOP=1)
 endif()
 

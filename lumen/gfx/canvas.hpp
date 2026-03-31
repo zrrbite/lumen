@@ -101,6 +101,10 @@ template <typename PixFmt> class Canvas
 		}
 	}
 
+  public:
+	static pixel_t to_pixel_static(Color c) { return to_pixel(c); }
+
+  private:
 	static pixel_t to_pixel(Color c)
 	{
 		if constexpr (sizeof(pixel_t) == 2)

@@ -2,12 +2,12 @@
 
 #include <cstring>
 
+#include "lumen/gfx/font.hpp"
 #include "lumen/ui/widget.hpp"
 
 namespace lumen::ui {
 
-/// A simple text label. Renders text as colored rectangle for now
-/// (bitmap font rendering comes in Phase 4).
+/// A text label with real bitmap font rendering.
 class Label : public Widget
 {
   public:
@@ -38,22 +38,17 @@ class Label : public Widget
 		invalidate();
 	}
 
+	void set_font(const gfx::BitmapFont* font) { font_ = font; }
+
 	void draw(gfx::Canvas<Rgb565>& canvas) override
 	{
-		// Draw background
 		canvas.fill_rect(bounds(), bg_color_);
-		// Draw text placeholder — a colored bar proportional to text length
-		uint16_t text_len = static_cast<uint16_t>(std::strlen(text_));
-		if (text_len > 0)
+
+		if (font_ && text_[0] != '\0')
 		{
-			uint16_t bar_w = text_len * 7; // ~7px per char placeholder
-			if (bar_w > bounds().w - 4)
-				bar_w = bounds().w - 4;
-			Rect text_rect{static_cast<int16_t>(bounds().x + 2),
-						   static_cast<int16_t>(bounds().y + 2),
-						   bar_w,
-						   static_cast<uint16_t>(bounds().h - 4)};
-			canvas.fill_rect(text_rect, fg_color_);
+			// Center text vertically
+			int16_t text_y = bounds().y + (bounds().h - font_->char_height) / 2;
+			font_->draw_string(canvas, static_cast<int16_t>(bounds().x + 4), text_y, text_, fg_color_);
 		}
 	}
 
@@ -62,6 +57,7 @@ class Label : public Widget
 	char text_[MAX_TEXT]			 = "";
 	Color fg_color_					 = Color::white();
 	Color bg_color_					 = Color::rgb(40, 40, 50);
+	const gfx::BitmapFont* font_	 = &gfx::font_6x8;
 };
 
 } // namespace lumen::ui
