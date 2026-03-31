@@ -168,19 +168,14 @@ template <typename BoardConfig> class Application
 		else
 		{
 			// Direct-to-display mode (SPI TFT, no framebuffer)
-			// Double-buffered band rendering: CPU renders into one buffer
-			// while DMA transfers the other to the display.
-			static constexpr size_t half_pixels = BoardConfig::scratch_buffer_size / sizeof(pixel_t) / 2;
-			static pixel_t scratch_a[half_pixels];
-			static pixel_t scratch_b[half_pixels];
-			pixel_t* buffers[2] = {scratch_a, scratch_b};
-			uint8_t buf_idx		= 0;
-			bool dma_active		= false;
+			// Render in horizontal bands using scratch buffer
+			static constexpr size_t scratch_pixels = BoardConfig::scratch_buffer_size / sizeof(pixel_t);
+			static pixel_t scratch[scratch_pixels];
 
 			for (uint8_t d = 0; d < dirty_.count(); ++d)
 			{
 				Rect dirty		= dirty_.rect(d);
-				uint16_t band_h = half_pixels / dirty.w;
+				uint16_t band_h = scratch_pixels / dirty.w;
 				if (band_h == 0)
 					band_h = 1;
 
@@ -190,40 +185,20 @@ template <typename BoardConfig> class Application
 					if (band_y + h > dirty.bottom())
 						h = dirty.bottom() - band_y;
 
-					pixel_t* buf		 = buffers[buf_idx];
 					uint32_t band_pixels = static_cast<uint32_t>(dirty.w) * h;
-
-					// Clear scratch buffer
 					for (uint32_t p = 0; p < band_pixels; ++p)
-						buf[p] = 0;
+						scratch[p] = 0;
 
 					Rect band{dirty.x, band_y, dirty.w, h};
-					gfx::Canvas<PF> canvas(buf, dirty.w, h);
+					gfx::Canvas<PF> canvas(scratch, dirty.w, h);
 					canvas.set_origin(dirty.x, band_y);
 					canvas.set_clip(band);
 
 					active_screen_->draw(canvas);
 
-					// Wait for previous DMA transfer to finish
-					if (dma_active)
-					{
-						board_.display.write_pixels_dma_wait();
-					}
-
-					// Start DMA transfer of this band
 					board_.display.set_window(band);
-					board_.display.write_pixels_dma(buf, band_pixels);
-					dma_active = true;
-
-					// Swap buffers — next iteration renders into the other
-					buf_idx ^= 1;
+					board_.display.write_pixels(scratch, band_pixels);
 				}
-			}
-
-			// Wait for final DMA transfer
-			if (dma_active)
-			{
-				board_.display.write_pixels_dma_wait();
 			}
 		}
 
