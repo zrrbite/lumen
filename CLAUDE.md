@@ -106,9 +106,9 @@ Best for: status text, counters, small labels where you know the exact size at c
 
 ```cpp
 #include "lumen/gfx/fonts/liberation_sans_sdf16.hpp"
-sdf_label.set_font(&lumen::gfx::liberation_sans_sdf16);
-sdf_label.set_target_size(20); // Render at 20px from 16px atlas
-sdf_label.set_target_size(8);  // Same atlas, now at 8px
+// Label accepts both bitmap and SDF fonts via FontFace:
+label.set_font(&lumen::gfx::liberation_sans_sdf16, 20); // SDF at 20px
+label.set_font(&lumen::gfx::liberation_sans_14);         // Bitmap at 14px
 ```
 
 | Pros | Cons |
@@ -146,6 +146,42 @@ anim.update(tick.now());
 ```
 
 Easing functions: `linear`, `in_quad`, `out_quad`, `in_out_quad`, `in_cubic`, `out_cubic`, `in_out_cubic`, `in_expo`, `out_expo`, `out_back`, `out_bounce`.
+
+## Pixel Format
+
+All widgets use `Canvas<ActivePixFmt>`. The pixel format is selected at compile time:
+
+- **RGB565** (default): 16-bit, used by SPI displays (F429-DISCO, ILI9341)
+- **ARGB8888**: 32-bit, used by LTDC framebuffer displays (F769-DISCO, H7 boards)
+
+To switch: define `LUMEN_ARGB8888` in CMake for the target. All widgets, fonts, and rendering automatically adapt.
+
+## Focus & Input
+
+Widgets support keyboard/encoder navigation in addition to touch:
+
+```cpp
+btn.set_focusable(true);  // Widget can receive focus
+screen.on_input(InputAction::FocusNext);  // Tab to next focusable widget
+screen.on_input(InputAction::Activate);   // Press/release focused widget
+```
+
+`InputAction` values: `FocusNext`, `FocusPrev`, `Activate`, `Back`.
+Container automatically manages focus chain among its children.
+
+## Live Reload (UART)
+
+Update widget properties at runtime over serial (115200 8N1):
+
+```
+SET title.text Hello World!
+SET title.color 100,200,255
+SET bar.value 75
+SET btn.visible 0
+PING
+```
+
+Requires WidgetRegistry with named widgets. See `examples/stm32f429_hello/`.
 
 ## Code Style
 
