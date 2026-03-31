@@ -1,0 +1,2 @@
+Checks: '-*,readability-*,-readability-identifier-naming,-readability-braces-around-statements'
+WarningsAsErrors: ''
