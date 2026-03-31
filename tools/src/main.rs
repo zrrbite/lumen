@@ -1,5 +1,6 @@
 mod font;
 mod image;
+mod sdf_font;
 
 use clap::{Parser, Subcommand};
 
@@ -34,6 +35,36 @@ enum Commands {
         first_char: u8,
 
         /// Last ASCII character to include
+        #[arg(long, default_value_t = 126)]
+        last_char: u8,
+    },
+
+    /// Convert a TTF/OTF font to a C++ SDF font header
+    SdfFont {
+        /// Path to the TTF/OTF font file
+        input: String,
+
+        /// Base rasterization size (SDF is generated at this size)
+        #[arg(short = 'b', long, default_value_t = 32.0)]
+        base_size: f32,
+
+        /// SDF spread in pixels (distance field radius)
+        #[arg(long, default_value_t = 4.0)]
+        spread: f32,
+
+        /// Output directory
+        #[arg(short, long, default_value = ".")]
+        output: String,
+
+        /// Variable name prefix
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// First ASCII character
+        #[arg(long, default_value_t = 32)]
+        first_char: u8,
+
+        /// Last ASCII character
         #[arg(long, default_value_t = 126)]
         last_char: u8,
     },
@@ -87,6 +118,37 @@ fn main() {
             if let Err(e) =
                 font::convert(&input, &sizes, &output, &name_prefix, first_char, last_char)
             {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        }
+        Commands::SdfFont {
+            input,
+            base_size,
+            spread,
+            output,
+            name,
+            first_char,
+            last_char,
+        } => {
+            let name_prefix = name.unwrap_or_else(|| {
+                std::path::Path::new(&input)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("font")
+                    .to_lowercase()
+                    .replace(['-', ' ', '.'], "_")
+            });
+
+            if let Err(e) = sdf_font::convert(
+                &input,
+                base_size,
+                spread,
+                &output,
+                &name_prefix,
+                first_char,
+                last_char,
+            ) {
                 eprintln!("Error: {e}");
                 std::process::exit(1);
             }

@@ -68,22 +68,68 @@ struct MyBoard {
 
 ## Font & Image Pipeline
 
-Generate bitmap fonts from TTF files using `lumen-tools`:
+Lumen supports two font formats: **Bitmap** (small, fast, fixed-size) and **SDF** (larger, scalable to any size).
+
+### Bitmap Fonts (BitmapFont)
+
+1bpp packed bitmaps. One file per size. Fast rendering, tiny footprint.
 
 ```bash
 cd tools && cargo build --release
-# Generate fonts at multiple sizes
-./target/release/lumen-tools font /path/to/Font.ttf --sizes 10,14,20 --output ../lumen/gfx/fonts
-# Generate with custom name prefix
-./target/release/lumen-tools font Font.ttf --sizes 12 --name my_font --output ../lumen/gfx/fonts
-# Convert PNG to C++ header (RGB565 for embedded)
-./target/release/lumen-tools image icon.png --output ../assets/icon.hpp
+# Generate bitmap fonts at specific sizes
+./target/release/lumen-tools font Font.ttf --sizes 10,14,20 --output ../lumen/gfx/fonts
 ```
 
-Generated font headers go in `lumen/gfx/fonts/` and produce `BitmapFont` instances:
 ```cpp
 #include "lumen/gfx/fonts/liberation_sans_14.hpp"
-label.set_font(&lumen::gfx::liberation_sans_14);
+label.set_font(&lumen::gfx::liberation_sans_14); // Renders at exactly 14px
+```
+
+| Pros | Cons |
+|------|------|
+| Tiny (1-3 KB per size) | Fixed size — need separate file per size |
+| Fast (1 bit per pixel check) | Jagged at non-native sizes |
+| No float math | Can't scale at runtime |
+
+Best for: status text, counters, small labels where you know the exact size at compile time.
+
+### SDF Fonts (SdfFont)
+
+8-bit signed distance fields. One file renders at **any size** with smooth edges.
+
+```bash
+# Generate SDF font (one atlas, renders at any size)
+./target/release/lumen-tools sdf-font Font.ttf --base-size 16 --spread 2 --output ../lumen/gfx/fonts
+# Larger base = more detail, more flash. Smaller = less detail, less flash.
+# --spread controls the smoothing radius (2-4 typical)
+```
+
+```cpp
+#include "lumen/gfx/fonts/liberation_sans_sdf16.hpp"
+sdf_label.set_font(&lumen::gfx::liberation_sans_sdf16);
+sdf_label.set_target_size(20); // Render at 20px from 16px atlas
+sdf_label.set_target_size(8);  // Same atlas, now at 8px
+```
+
+| Pros | Cons |
+|------|------|
+| One atlas → any size (~4px to ~2× base) | Larger (42 KB for 16px base, 95 glyphs) |
+| Smooth edges at all scales | Slower (distance sample per pixel) |
+| Supports effects (outline, glow, shadow) | Needs FPU for spread calculation |
+
+Best for: titles, dynamic UI where text size changes, or when you want one font to cover all sizes.
+
+### Choosing Between Them
+
+- **RAM-constrained (M0, <64KB)**: bitmap only, 6x8 built-in + one generated size
+- **Standard (M4, 128-256KB)**: bitmap for body text, SDF for titles
+- **Full (M7, 512KB+)**: SDF everywhere, larger base sizes for detail
+
+### Image Converter
+
+```bash
+./target/release/lumen-tools image icon.png --output ../assets/icon.hpp  # RGB565
+./target/release/lumen-tools image icon.png --format argb8888            # With alpha
 ```
 
 Built-in fonts: `font_6x8` (6x8 monospace, 760 bytes — always available).
