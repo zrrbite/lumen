@@ -25,21 +25,14 @@ struct SdfFont
 	uint8_t last_char;
 
 	/// Draw a string at the given position and target size.
-	/// The SDF is scaled from base_size to target_size.
 	template <typename PixFmt>
 	void draw_string(
 		Canvas<PixFmt>& canvas, int16_t x_pos, int16_t y_pos, const char* text, Color color, uint16_t target_size) const
 	{
-		// Scale factor from base to target
 		uint32_t scale_num = target_size;
 		uint32_t scale_den = base_size;
-
-		// Scaled cell dimensions
-		uint16_t out_w = static_cast<uint16_t>((cell_w * scale_num) / scale_den);
-		uint16_t out_h = static_cast<uint16_t>((cell_h * scale_num) / scale_den);
-
-		// Character spacing (scaled)
-		int16_t advance = static_cast<int16_t>((out_w * 3) / 4); // ~75% of cell width
+		uint16_t out_w	   = static_cast<uint16_t>((cell_w * scale_num) / scale_den);
+		int16_t advance	   = static_cast<int16_t>((out_w * 3) / 4);
 
 		int16_t cursor_x = x_pos;
 		while (*text)
@@ -71,6 +64,10 @@ struct SdfFont
 	}
 
 	/// Draw a single SDF character, scaled to target_size.
+	/// Uses 3-level rendering for anti-aliasing on RGB565:
+	///   - Above edge_hi: full color
+	///   - Between edge_lo and edge_hi: half-intensity (simple AA)
+	///   - Below edge_lo: skip (background)
 	template <typename PixFmt>
 	void draw_char_sdf(
 		Canvas<PixFmt>& canvas, int16_t x_pos, int16_t y_pos, uint8_t ch, Color color, uint16_t target_size) const
@@ -82,25 +79,24 @@ struct SdfFont
 		uint32_t glyph_offset = glyph_idx * cell_w * cell_h;
 		const uint8_t* sdf	  = data + glyph_offset;
 
-		// Scale factor (fixed-point 16.16 for precision)
 		uint32_t scale_num = target_size;
 		uint32_t scale_den = base_size;
+		uint16_t out_w	   = static_cast<uint16_t>((cell_w * scale_num) / scale_den);
+		uint16_t out_h	   = static_cast<uint16_t>((cell_h * scale_num) / scale_den);
 
-		uint16_t out_w = static_cast<uint16_t>((cell_w * scale_num) / scale_den);
-		uint16_t out_h = static_cast<uint16_t>((cell_h * scale_num) / scale_den);
+		auto px_full = Canvas<PixFmt>::to_pixel_static(color);
 
-		auto px = Canvas<PixFmt>::to_pixel_static(color);
+		// Half-intensity color for edge anti-aliasing
+		auto px_edge = Canvas<PixFmt>::to_pixel_static(Color::rgb(color.r / 2, color.g / 2, color.b / 2));
 
-		// Anti-aliasing edge width (in SDF units)
-		// Wider at small sizes for smoother edges, narrower at large sizes for crispness
-		uint8_t edge_lo = 110; // Below this = definitely outside
-		uint8_t edge_hi = 145; // Above this = definitely inside
+		// Thresholds
+		uint8_t edge_lo = 105; // Below: outside
+		uint8_t edge_hi = 150; // Above: fully inside
 
 		for (uint16_t oy = 0; oy < out_h; ++oy)
 		{
 			for (uint16_t ox = 0; ox < out_w; ++ox)
 			{
-				// Map output pixel to SDF coordinates
 				uint32_t sx = (ox * scale_den) / scale_num;
 				uint32_t sy = (oy * scale_den) / scale_num;
 
@@ -111,13 +107,17 @@ struct SdfFont
 
 				uint8_t dist = sdf[sy * cell_w + sx];
 
+				int16_t out_x = static_cast<int16_t>(x_pos + ox);
+				int16_t out_y = static_cast<int16_t>(y_pos + oy);
+
 				if (dist >= edge_hi)
 				{
-					// Fully inside — draw pixel
-					canvas.put_pixel(static_cast<int16_t>(x_pos + ox), static_cast<int16_t>(y_pos + oy), px);
+					canvas.put_pixel(out_x, out_y, px_full);
 				}
-				// Between edge_lo and edge_hi: could do alpha blending for AA
-				// but on RGB565 without alpha support, we skip
+				else if (dist >= edge_lo)
+				{
+					canvas.put_pixel(out_x, out_y, px_edge);
+				}
 			}
 		}
 	}
