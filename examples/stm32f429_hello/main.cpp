@@ -1,8 +1,6 @@
 /// Lumen interactive demo on STM32F429-DISCO.
 /// Touch the buttons! Uses ILI9341 display + STMPE811 touch.
 
-#include <cstdio>
-
 #include "lumen/core/application.hpp"
 #include "lumen/ui/screen.hpp"
 #include "lumen/ui/widgets/button.hpp"
@@ -14,6 +12,34 @@ using Board = lumen::platform::Stm32f429DiscoConfig;
 
 static int touch_count	 = 0;
 static uint8_t bar_value = 0;
+
+// Simple int-to-string (no snprintf, no newlib locks)
+static void int_to_str(char* buf, const char* prefix, int val)
+{
+	while (*prefix)
+		*buf++ = *prefix++;
+	if (val == 0)
+	{
+		*buf++ = '0';
+		*buf   = '\0';
+		return;
+	}
+	if (val < 0)
+	{
+		*buf++ = '-';
+		val	   = -val;
+	}
+	char tmp[12];
+	int len = 0;
+	while (val > 0)
+	{
+		tmp[len++] = '0' + (val % 10);
+		val /= 10;
+	}
+	for (int i = len - 1; i >= 0; --i)
+		*buf++ = tmp[i];
+	*buf = '\0';
+}
 
 class HelloScreen : public lumen::ui::Screen
 {
@@ -65,7 +91,7 @@ class HelloScreen : public lumen::ui::Screen
 	void update_model() override
 	{
 		char buf[32];
-		snprintf(buf, sizeof(buf), "Touches: %d", touch_count);
+		int_to_str(buf, "Touches: ", touch_count);
 		counter_.set_text(buf);
 		bar_.set_value(bar_value);
 	}
