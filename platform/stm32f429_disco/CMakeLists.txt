@@ -23,7 +23,7 @@ target_link_options(stm32f429_disco PUBLIC
     -mthumb
     -T${CMAKE_CURRENT_SOURCE_DIR}/stm32f429zi.ld
     -Wl,--gc-sections
-    -specs=nosys.specs
-    -specs=nano.specs
-    --no-warn-rwx-segments
+    -lnosys
+    -lc
+    -Wl,--no-warn-rwx-segments
 )

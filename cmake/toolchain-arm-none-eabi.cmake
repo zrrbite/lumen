@@ -9,7 +9,7 @@ set(CMAKE_SIZE arm-none-eabi-size)
 
 set(CMAKE_CXX_FLAGS_INIT "-mthumb -ffunction-sections -fdata-sections -fno-exceptions -fno-rtti")
 set(CMAKE_C_FLAGS_INIT "-mthumb -ffunction-sections -fdata-sections")
-set(CMAKE_EXE_LINKER_FLAGS_INIT "-Wl,--gc-sections -specs=nosys.specs -specs=nano.specs")
+set(CMAKE_EXE_LINKER_FLAGS_INIT "-Wl,--gc-sections -lnosys")
 
 # Prevent CMake from trying to link a test program (bare metal has no OS)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)

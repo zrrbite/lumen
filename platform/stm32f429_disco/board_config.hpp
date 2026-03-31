@@ -7,6 +7,8 @@
 /// LCD_CS:  PC2
 /// LCD_DCX: PD13
 
+#include <cstddef>
+
 #include "drivers/display/ili9341_spi.hpp"
 #include "lumen/hal/input_driver.hpp"
 #include "lumen/hal/os/bare_metal.hpp"
