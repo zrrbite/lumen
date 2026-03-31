@@ -15,6 +15,7 @@
 #include "drivers/touch/stmpe811.hpp"
 #include "lumen/hal/input_driver.hpp"
 #include "lumen/hal/os/bare_metal.hpp"
+#include "lumen/hal/stm32/dma2d.hpp"
 #include "lumen/hal/stm32/gpio.hpp"
 #include "lumen/hal/stm32/i2c.hpp"
 #include "lumen/hal/stm32/spi.hpp"
@@ -94,7 +95,9 @@ struct Stm32f429DiscoConfig
 
 		// Init peripherals
 		SPI5Drv::init_master(2); // ~11MHz (APB2=90MHz / 8)
+		SPI5Drv::enable_dma_clock();
 		I2C3Drv::init();
+		Dma2d::enable_clock();
 
 		// Init drivers
 		display.init();

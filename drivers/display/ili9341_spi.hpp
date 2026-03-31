@@ -76,7 +76,7 @@ template <typename SpiDrv, typename PinDC, typename PinCS, typename PinRST> clas
 		send_cmd(0x2C); // Memory write
 	}
 
-	/// Write pixel data (RGB565, big-endian on wire).
+	/// Write pixel data (RGB565, big-endian on wire). Blocking.
 	void write_pixels(const pixel_t* data, uint32_t count)
 	{
 		PinDC::high();
@@ -84,6 +84,27 @@ template <typename SpiDrv, typename PinDC, typename PinCS, typename PinRST> clas
 		SpiDrv::transmit16(data, count);
 		PinCS::high();
 	}
+
+	/// Start a non-blocking DMA pixel transfer.
+	/// Call write_pixels_dma_wait() before toggling CS or starting another.
+	void write_pixels_dma(const pixel_t* data, uint32_t count)
+	{
+		PinDC::high();
+		PinCS::low();
+		SpiDrv::enable_dma_clock();
+		SpiDrv::transmit16_dma(data, count);
+		// Returns immediately — DMA handles the transfer
+	}
+
+	/// Wait for DMA pixel transfer to complete and release CS.
+	void write_pixels_dma_wait()
+	{
+		SpiDrv::dma_wait();
+		PinCS::high();
+	}
+
+	/// Check if DMA transfer is still in progress.
+	bool dma_busy() const { return SpiDrv::dma_busy(); }
 
 	/// No-op for SPI displays — data is streamed directly.
 	void flush() {}
