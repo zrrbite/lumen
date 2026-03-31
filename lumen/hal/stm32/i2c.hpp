@@ -1,6 +1,7 @@
 #pragma once
 
 /// Minimal STM32 I2C abstraction — direct register access.
+/// All wait loops have timeouts to prevent system hangs.
 
 #include <cstdint>
 
@@ -29,6 +30,8 @@ struct I2cRegs
 
 template <I2cInstance Inst> struct I2c
 {
+	static constexpr uint32_t TIMEOUT = 100000; // ~5ms at 180MHz
+
 	static I2cRegs* regs() { return reinterpret_cast<I2cRegs*>(static_cast<uint32_t>(Inst)); }
 
 	static void enable_clock()
@@ -51,11 +54,23 @@ template <I2cInstance Inst> struct I2c
 		regs()->CR1	  = (1U << 0); // PE: enable
 	}
 
-	static void start()
+	/// Software reset to recover from bus errors.
+	static void reset()
+	{
+		regs()->CR1 |= (1U << 15);	// SWRST
+		regs()->CR1 &= ~(1U << 15); // Clear SWRST
+		init();						// Re-init
+	}
+
+	static bool start()
 	{
 		regs()->CR1 |= (1U << 8); // START
-		while ((regs()->SR1 & (1U << 0)) == 0)
-		{} // Wait SB
+		for (uint32_t t = TIMEOUT; t > 0; --t)
+		{
+			if (regs()->SR1 & (1U << 0))
+				return true; // SB set
+		}
+		return false;
 	}
 
 	static void stop()
@@ -63,58 +78,105 @@ template <I2cInstance Inst> struct I2c
 		regs()->CR1 |= (1U << 9); // STOP
 	}
 
-	static void send_addr(uint8_t addr, bool read)
+	static bool send_addr(uint8_t addr, bool read)
 	{
 		regs()->DR = (addr << 1) | (read ? 1 : 0);
-		while ((regs()->SR1 & (1U << 1)) == 0)
-		{}									   // Wait ADDR
-		volatile uint32_t dummy = regs()->SR2; // Clear ADDR
-		(void)dummy;
+		for (uint32_t t = TIMEOUT; t > 0; --t)
+		{
+			uint32_t sr1 = regs()->SR1;
+			if (sr1 & (1U << 10))
+			{			// AF (NACK)
+				stop(); // Release bus
+				return false;
+			}
+			if (sr1 & (1U << 1))
+			{										   // ADDR
+				volatile uint32_t dummy = regs()->SR2; // Clear ADDR
+				(void)dummy;
+				return true;
+			}
+		}
+		stop();
+		return false;
 	}
 
-	static void write_byte(uint8_t data)
+	static bool write_byte(uint8_t data)
 	{
-		while ((regs()->SR1 & (1U << 7)) == 0)
-		{} // Wait TXE
+		for (uint32_t t = TIMEOUT; t > 0; --t)
+		{
+			if (regs()->SR1 & (1U << 7))
+				break; // TXE
+			if (t == 1)
+				return false;
+		}
 		regs()->DR = data;
-		while ((regs()->SR1 & (1U << 2)) == 0)
-		{} // Wait BTF
+		for (uint32_t t = TIMEOUT; t > 0; --t)
+		{
+			if (regs()->SR1 & (1U << 2))
+				return true; // BTF
+		}
+		return false;
 	}
 
 	static uint8_t read_byte_ack()
 	{
 		regs()->CR1 |= (1U << 10); // ACK
-		while ((regs()->SR1 & (1U << 6)) == 0)
-		{} // Wait RXNE
-		return static_cast<uint8_t>(regs()->DR);
+		for (uint32_t t = TIMEOUT; t > 0; --t)
+		{
+			if (regs()->SR1 & (1U << 6))
+				return static_cast<uint8_t>(regs()->DR); // RXNE
+		}
+		return 0;
 	}
 
 	static uint8_t read_byte_nack()
 	{
 		regs()->CR1 &= ~(1U << 10); // NACK
-		while ((regs()->SR1 & (1U << 6)) == 0)
-		{} // Wait RXNE
-		return static_cast<uint8_t>(regs()->DR);
+		for (uint32_t t = TIMEOUT; t > 0; --t)
+		{
+			if (regs()->SR1 & (1U << 6))
+				return static_cast<uint8_t>(regs()->DR); // RXNE
+		}
+		return 0;
 	}
 
-	/// Write a register on a device.
-	static void write_reg(uint8_t dev_addr, uint8_t reg, uint8_t val)
+	/// Write a register on a device. Returns true on success.
+	static bool write_reg(uint8_t dev_addr, uint8_t reg, uint8_t val)
 	{
-		start();
-		send_addr(dev_addr, false);
-		write_byte(reg);
-		write_byte(val);
+		if (!start())
+			return false;
+		if (!send_addr(dev_addr, false))
+			return false;
+		if (!write_byte(reg))
+		{
+			stop();
+			return false;
+		}
+		if (!write_byte(val))
+		{
+			stop();
+			return false;
+		}
 		stop();
+		return true;
 	}
 
 	/// Read a register from a device.
 	static uint8_t read_reg(uint8_t dev_addr, uint8_t reg)
 	{
-		start();
-		send_addr(dev_addr, false);
-		write_byte(reg);
-		start(); // Repeated start
-		send_addr(dev_addr, true);
+		if (!start())
+			return 0;
+		if (!send_addr(dev_addr, false))
+			return 0;
+		if (!write_byte(reg))
+		{
+			stop();
+			return 0;
+		}
+		if (!start())
+			return 0;
+		if (!send_addr(dev_addr, true))
+			return 0;
 		uint8_t val = read_byte_nack();
 		stop();
 		return val;
@@ -123,15 +185,57 @@ template <I2cInstance Inst> struct I2c
 	/// Read two bytes (big-endian 16-bit).
 	static uint16_t read_reg16(uint8_t dev_addr, uint8_t reg)
 	{
-		start();
-		send_addr(dev_addr, false);
-		write_byte(reg);
-		start();
-		send_addr(dev_addr, true);
+		if (!start())
+			return 0;
+		if (!send_addr(dev_addr, false))
+			return 0;
+		if (!write_byte(reg))
+		{
+			stop();
+			return 0;
+		}
+		if (!start())
+			return 0;
+		if (!send_addr(dev_addr, true))
+			return 0;
 		uint8_t hi = read_byte_ack();
 		uint8_t lo = read_byte_nack();
 		stop();
 		return (static_cast<uint16_t>(hi) << 8) | lo;
+	}
+
+	/// Read multiple bytes from a register into a buffer.
+	static void read_reg_multi(uint8_t dev_addr, uint8_t reg, uint8_t* buf, uint8_t len)
+	{
+		if (len == 0)
+			return;
+		if (len == 1)
+		{
+			buf[0] = read_reg(dev_addr, reg);
+			return;
+		}
+
+		if (!start())
+			return;
+		if (!send_addr(dev_addr, false))
+			return;
+		if (!write_byte(reg))
+		{
+			stop();
+			return;
+		}
+		if (!start())
+			return;
+		if (!send_addr(dev_addr, true))
+			return;
+		for (uint8_t i = 0; i < len; ++i)
+		{
+			if (i < len - 1)
+				buf[i] = read_byte_ack();
+			else
+				buf[i] = read_byte_nack();
+		}
+		stop();
 	}
 };
 

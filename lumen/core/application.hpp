@@ -173,19 +173,22 @@ template <typename BoardConfig> class Application
 					if (band_y + h > dirty.bottom())
 						h = dirty.bottom() - band_y;
 
+					// Clear scratch buffer
+					uint32_t band_pixels = static_cast<uint32_t>(dirty.w) * h;
+					for (uint32_t p = 0; p < band_pixels; ++p)
+						scratch[p] = 0;
+
 					Rect band{dirty.x, band_y, dirty.w, h};
 					gfx::Canvas<PF> canvas(scratch, dirty.w, h);
-					// Offset canvas so widgets draw at correct positions
-					// by setting clip to the band's screen coordinates
-					canvas.set_clip({0, 0, dirty.w, h});
+					// Set origin so widgets drawing in screen coordinates
+					// map correctly into the scratch buffer
+					canvas.set_origin(dirty.x, band_y);
+					canvas.set_clip(band);
 
-					// TODO: proper coordinate translation for band rendering
-					// For now, draw full screen into scratch and send
-					// This is inefficient but correct for first bring-up
 					active_screen_->draw(canvas);
 
 					board_.display.set_window(band);
-					board_.display.write_pixels(scratch, static_cast<uint32_t>(dirty.w) * h);
+					board_.display.write_pixels(scratch, band_pixels);
 				}
 			}
 		}

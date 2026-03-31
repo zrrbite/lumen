@@ -1,6 +1,7 @@
 #pragma once
 
 /// STMPE811 resistive touch controller driver.
+/// Init sequence and touch reading based on ST's BSP driver.
 /// Used on STM32F429-DISCO.
 
 #include "lumen/hal/touch_driver.hpp"
@@ -23,47 +24,72 @@ template <typename I2cDrv> class Stmpe811
 		I2cDrv::write_reg(ADDR, 0x03, 0x02); // SYS_CTRL1: soft reset
 		delay_(10);
 		I2cDrv::write_reg(ADDR, 0x03, 0x00); // Clear reset
-
-		// Enable TSC and ADC clocks
-		I2cDrv::write_reg(ADDR, 0x04, 0x0C); // SYS_CTRL2: enable TSC + ADC
-
-		// Configure ADC
-		I2cDrv::write_reg(ADDR, 0x20, 0x49); // ADC_CTRL1: sample time, 12-bit
 		delay_(2);
-		I2cDrv::write_reg(ADDR, 0x21, 0x01); // ADC_CTRL2: ADC clock speed
 
-		// Configure GPIO AF for touchscreen
-		I2cDrv::write_reg(ADDR, 0x17, 0x00); // GPIO_AF: all pins as ADC/TSC
+		// SYS_CTRL2: enable GPIO + TSC + ADC, disable only temp sensor
+		// Must enable GPIO clock BEFORE writing GPIO_AF register
+		I2cDrv::write_reg(ADDR, 0x04, 0x08); // SYS_CTRL2: only TS_OFF=1
 
-		// Configure touchscreen
-		I2cDrv::write_reg(ADDR, 0x41, 0x9A); // TSC_CFG: averaging, touch detect delay
-		I2cDrv::write_reg(ADDR, 0x4A, 0x01); // FIFO_TH: FIFO threshold = 1
-		I2cDrv::write_reg(ADDR, 0x4B, 0x01); // FIFO_STA: reset FIFO
+		// Select TSC pins in TSC alternate mode (GPIO clock must be on)
+		I2cDrv::write_reg(ADDR, 0x17, 0x00); // GPIO_AF: all pins as TSC
+
+		// Configure ADC: sample time=80 clocks, 12-bit, internal ref
+		I2cDrv::write_reg(ADDR, 0x20, 0x48); // ADC_CTRL1
+		delay_(2);
+
+		// ADC clock speed: 3.25 MHz
+		I2cDrv::write_reg(ADDR, 0x21, 0x01); // ADC_CTRL2
+
+		// Touch screen config:
+		// - Touch average control: 4 samples
+		// - Touch delay time: 500 uS
+		// - Panel driver settling time: 500 uS
+		I2cDrv::write_reg(ADDR, 0x41, 0x9A); // TSC_CFG
+
+		// FIFO threshold = 1
+		I2cDrv::write_reg(ADDR, 0x4A, 0x01); // FIFO_TH
+
+		// Reset FIFO
+		I2cDrv::write_reg(ADDR, 0x4B, 0x01); // FIFO_STA: reset
 		I2cDrv::write_reg(ADDR, 0x4B, 0x00); // FIFO_STA: unreset
 
-		// Set fraction Z
-		I2cDrv::write_reg(ADDR, 0x56, 0x07); // TSC_FRACT_Z
-		I2cDrv::write_reg(ADDR, 0x42, 0x01); // TSC_I_DRIVE: 50mA
+		// Fractional part = 1, whole part = 7 (for Z pressure)
+		I2cDrv::write_reg(ADDR, 0x56, 0x01); // TSC_FRACT_XYZ
 
-		// Enable touchscreen
-		I2cDrv::write_reg(ADDR, 0x40, 0x01); // TSC_CTRL: enable, no window
+		// Driving capability: 50mA
+		I2cDrv::write_reg(ADDR, 0x58, 0x01); // TSC_I_DRIVE
+
+		// Enable TSC: XY acquisition mode, tracking enabled, window=127
+		// 0x73 = EN | OP_MOD=XY_only(11) | TRACK(1) | TRACK_0=11
+		I2cDrv::write_reg(ADDR, 0x40, 0x73); // TSC_CTRL
+
+		// Clear all pending interrupt status
+		I2cDrv::write_reg(ADDR, 0x0B, 0xFF); // INT_STA
+
+		delay_(2);
 	}
 
 	bool poll(hal::TouchPoint& out)
 	{
-		uint8_t status = I2cDrv::read_reg(ADDR, 0x40); // TSC_CTRL
-		bool touching  = (status & (1U << 7)) != 0;
+		// Check FIFO level for touch data (ST BSP approach)
+		uint8_t fifo_level = I2cDrv::read_reg(ADDR, 0x4C); // FIFO_SIZE
 
-		if (touching)
+		if (fifo_level > 0)
 		{
-			// Read XY data (12-bit each, packed in 3 bytes)
-			uint16_t raw_x = I2cDrv::read_reg16(ADDR, 0x4D); // TSC_DATA_X
-			uint16_t raw_y = I2cDrv::read_reg16(ADDR, 0x4F); // TSC_DATA_Y
+			// Read XY data from FIFO (3 bytes, non-incrementing)
+			uint8_t data[3];
+			I2cDrv::read_reg_multi(ADDR, 0xD7, data, 3); // TSC_DATA_NON_INC
 
-			// Map to display coordinates (240x320)
-			// STMPE811 returns ~200-3900 range, map to pixels
-			int16_t px = static_cast<int16_t>(((raw_x - 200) * 240) / 3700);
-			int16_t py = static_cast<int16_t>(((raw_y - 200) * 320) / 3700);
+			// Unpack: X = data[0..1] bits [23:12], Y = data[1..2] bits [11:0]
+			uint32_t raw = (static_cast<uint32_t>(data[0]) << 16) | (static_cast<uint32_t>(data[1]) << 8) |
+						   static_cast<uint32_t>(data[2]);
+			uint16_t raw_x = (raw >> 12) & 0xFFF;
+			uint16_t raw_y = raw & 0xFFF;
+
+			// Map 12-bit ADC values to display coordinates (240x320)
+			// STM32F429-DISCO: no swap, Y axis inverted
+			int16_t px = static_cast<int16_t>((raw_x * 240) / 4096);
+			int16_t py = static_cast<int16_t>(320 - (raw_y * 320) / 4096);
 
 			// Clamp
 			if (px < 0)
@@ -79,13 +105,17 @@ template <typename I2cDrv> class Stmpe811
 			out.pressed	 = true;
 			out.pressure = 128;
 
+			was_pressed_ = true;
+			last_pos_	 = out.pos;
+
 			// Reset FIFO
 			I2cDrv::write_reg(ADDR, 0x4B, 0x01);
 			I2cDrv::write_reg(ADDR, 0x4B, 0x00);
 
 			return true;
 		}
-		else if (was_pressed_)
+
+		if (was_pressed_)
 		{
 			out.pos		 = last_pos_;
 			out.pressed	 = false;

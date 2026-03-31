@@ -62,7 +62,7 @@ struct Stm32f429DiscoConfig
 	using OS	  = hal::BareMetalOS;
 
 	static constexpr size_t framebuffer_count	= 0;
-	static constexpr size_t scratch_buffer_size = 960;
+	static constexpr size_t scratch_buffer_size = 4800; // 10 lines × 240px × 2B
 	static constexpr bool use_external_ram		= false;
 
 	Display display{delay_ms};
@@ -88,12 +88,12 @@ struct Stm32f429DiscoConfig
 		LCD_DCX::init_output();
 		LCD_RST::init_output();
 
-		// I2C3 pins (AF4, open-drain)
-		I2C3_SCL::init_af(4);
-		I2C3_SDA::init_af(4);
+		// I2C3 pins (AF4, open-drain for I2C)
+		I2C3_SCL::init_af_od(4);
+		I2C3_SDA::init_af_od(4);
 
 		// Init peripherals
-		SPI5Drv::init_master(3); // ~11MHz
+		SPI5Drv::init_master(2); // ~11MHz (APB2=90MHz / 8)
 		I2C3Drv::init();
 
 		// Init drivers

@@ -62,7 +62,7 @@ template <Port P, uint8_t Pin> struct GpioPin
 		regs()->OTYPER &= ~(1U << Pin);
 	}
 
-	/// Configure as alternate function.
+	/// Configure as alternate function (push-pull).
 	static void init_af(uint8_t af_num)
 	{
 		// MODER: 10 = alternate function
@@ -70,6 +70,34 @@ template <Port P, uint8_t Pin> struct GpioPin
 		regs()->MODER |= (2U << (Pin * 2));
 		// OSPEEDR: 11 = very high speed
 		regs()->OSPEEDR |= (3U << (Pin * 2));
+		// OTYPER: 0 = push-pull
+		regs()->OTYPER &= ~(1U << Pin);
+		// Set AF number
+		if constexpr (Pin < 8)
+		{
+			regs()->AFRL &= ~(0xFU << (Pin * 4));
+			regs()->AFRL |= (static_cast<uint32_t>(af_num) << (Pin * 4));
+		}
+		else
+		{
+			regs()->AFRH &= ~(0xFU << ((Pin - 8) * 4));
+			regs()->AFRH |= (static_cast<uint32_t>(af_num) << ((Pin - 8) * 4));
+		}
+	}
+
+	/// Configure as alternate function (open-drain, for I2C).
+	static void init_af_od(uint8_t af_num)
+	{
+		// MODER: 10 = alternate function
+		regs()->MODER &= ~(3U << (Pin * 2));
+		regs()->MODER |= (2U << (Pin * 2));
+		// OSPEEDR: 11 = very high speed
+		regs()->OSPEEDR |= (3U << (Pin * 2));
+		// OTYPER: 1 = open-drain
+		regs()->OTYPER |= (1U << Pin);
+		// PUPDR: 01 = pull-up
+		regs()->PUPDR &= ~(3U << (Pin * 2));
+		regs()->PUPDR |= (1U << (Pin * 2));
 		// Set AF number
 		if constexpr (Pin < 8)
 		{

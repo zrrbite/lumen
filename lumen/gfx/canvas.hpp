@@ -15,6 +15,15 @@ template <typename PixFmt> class Canvas
 		: buf_(buffer), width_(buf_width), height_(buf_height)
 	{}
 
+	/// Set the origin offset for band rendering.
+	/// Widgets draw in screen coordinates; the canvas subtracts
+	/// the origin to index into the scratch buffer.
+	void set_origin(int16_t x, int16_t y)
+	{
+		origin_x_ = x;
+		origin_y_ = y;
+	}
+
 	/// Set clipping rectangle. All drawing is clipped to this area.
 	void set_clip(Rect clip) { clip_ = clip; }
 
@@ -80,12 +89,15 @@ template <typename PixFmt> class Canvas
 		}
 	}
 
-	/// Direct pixel write (no clipping).
+	/// Direct pixel write (no clipping). Coordinates are in screen space;
+	/// origin offset is subtracted to map into the buffer.
 	void put_pixel(int16_t x, int16_t y, pixel_t px)
 	{
-		if (x >= 0 && x < width_ && y >= 0 && y < height_)
+		int16_t bx = static_cast<int16_t>(x - origin_x_);
+		int16_t by = static_cast<int16_t>(y - origin_y_);
+		if (bx >= 0 && bx < width_ && by >= 0 && by < height_)
 		{
-			buf_[y * width_ + x] = px;
+			buf_[by * width_ + bx] = px;
 		}
 	}
 
@@ -97,7 +109,12 @@ template <typename PixFmt> class Canvas
 	{
 		if (clip_.contains({x, y}))
 		{
-			put_pixel(x, y, px);
+			int16_t bx = static_cast<int16_t>(x - origin_x_);
+			int16_t by = static_cast<int16_t>(y - origin_y_);
+			if (bx >= 0 && bx < width_ && by >= 0 && by < height_)
+			{
+				buf_[by * width_ + bx] = px;
+			}
 		}
 	}
 
@@ -116,6 +133,8 @@ template <typename PixFmt> class Canvas
 	pixel_t* buf_;
 	uint16_t width_;
 	uint16_t height_;
+	int16_t origin_x_ = 0;
+	int16_t origin_y_ = 0;
 	Rect clip_{0, 0, 0xFFFF, 0xFFFF}; // Default: no clipping
 };
 
