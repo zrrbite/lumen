@@ -289,15 +289,21 @@ int main()
 	delay(1);
 	for (volatile int t = 0; t < 1000000 && !(r(D, 0x40C) & (1U << 8)); ++t)
 	{}
-	// 3c. PHY: 2 lanes, TX escape div
-	r(D, 0xA4) = 1; // 2 lanes
-	r(D, 0x08) = 4; // TXEscapeCkdiv
-	// 3d. Clock lane + data lane timers
-	r(D, 0x94) = (1U << 0) | (1U << 1);	   // CLCR
+	// 3c. D-PHY enable (before lane config, per HAL)
+	r(D, 0xA0) |= (1U << 1) | (1U << 2); // PCTLR: CKE + DEN
+	// 3d. Clock lane config
+	r(D, 0x94) = (1U << 0); // CLCR: DPCC only (no auto clock lane)
+	// 3e. Number of lanes + TX escape clock
+	r(D, 0xA4) = 1; // PCONFR: 2 data lanes
+	r(D, 0x08) = 4; // CCR: TXEscapeCkdiv
+	// 3f. UIX4 = 8 (unit interval for 500MHz PHY clock)
+	r(D, 0x418) = 8; // WPCR[0]: UIX4
+	// 3g. Clock lane + data lane timers
 	r(D, 0x98) = (35U << 0) | (35U << 16); // CLTCR
 	r(D, 0x9C) = (35U << 0) | (35U << 16); // DLTCR
-	// 3e. Enable D-PHY (THIS IS IN HAL_DSI_Init, not after!)
-	r(D, 0xA0) = (1U << 1) | (1U << 2); // PCTLR: CKE + DEN
+	// 3h. Disable error interrupts
+	r(D, 0xC4) = 0; // IER[0]
+	r(D, 0xC8) = 0; // IER[1]
 
 	// 4. HAL_DSI_ConfigVideoMode equivalent
 	r(D, 0x34) &= ~1U; // MCR: video mode (clear CMDM)
