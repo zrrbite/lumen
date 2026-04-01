@@ -24,23 +24,18 @@ cmake --build "$BUILD_DIR" --target integration_f429 2>&1 | tail -3
 
 echo ""
 echo "=== Flashing ==="
-# Kill any leftover probe-rs processes
 killall -q probe-rs 2>/dev/null || true
 sleep 1
 
-# Use 'probe-rs run' which flashes + starts execution.
-# Run in background, let firmware execute, then kill probe-rs
-# to release the USB device for subsequent reads.
-probe-rs run --chip "$CHIP" "$BINARY" >/dev/null 2>&1 &
-PROBE_PID=$!
+# Flash, reset, then read. Use --connect-under-reset to ensure clean state.
+probe-rs download --chip "$CHIP" --connect-under-reset "$BINARY" 2>&1 | tail -2
+sleep 1
+
+# Reset to start execution (release from debug halt)
+probe-rs reset --chip "$CHIP" --connect-under-reset 2>&1 || true
 
 echo "Waiting for firmware to complete..."
-sleep 4
-
-# Release the probe
-kill $PROBE_PID 2>/dev/null || true
-wait $PROBE_PID 2>/dev/null || true
-sleep 1
+sleep 3
 
 echo ""
 echo "=== Reading control block ==="
