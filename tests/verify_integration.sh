@@ -28,20 +28,19 @@ echo "=== Flashing ==="
 killall -q probe-rs 2>/dev/null || true
 sleep 1
 
-# Flash with retry
-for attempt in 1 2 3; do
-    if probe-rs download --chip "$CHIP" "$BINARY" 2>&1 | tail -2; then
-        break
-    fi
-    echo "Flash attempt $attempt failed, retrying..."
-    killall -q probe-rs 2>/dev/null || true
-    sleep 2
-done
+# Use 'probe-rs run' which flashes + starts execution.
+# Run in background, let firmware execute, then kill probe-rs
+# to release the USB device for subsequent reads.
+probe-rs run --chip "$CHIP" "$BINARY" >/dev/null 2>&1 &
+PROBE_PID=$!
 
-# Reset and let firmware run
-probe-rs reset --chip "$CHIP" 2>&1 || true
 echo "Waiting for firmware to complete..."
-sleep 3
+sleep 4
+
+# Release the probe
+kill $PROBE_PID 2>/dev/null || true
+wait $PROBE_PID 2>/dev/null || true
+sleep 1
 
 echo ""
 echo "=== Reading control block ==="
