@@ -125,11 +125,22 @@ Best for: titles, dynamic UI where text size changes, or when you want one font 
 - **Standard (M4, 128-256KB)**: bitmap for body text, SDF for titles
 - **Full (M7, 512KB+)**: SDF everywhere, larger base sizes for detail
 
-### Image Converter
+### Image Converter & Widget
+
+Convert PNGs to C++ headers, display with the Image widget:
 
 ```bash
-./target/release/lumen-tools image icon.png --output ../assets/icon.hpp  # RGB565
-./target/release/lumen-tools image icon.png --format argb8888            # With alpha
+./target/release/lumen-tools image icon.png --output ../lumen/gfx/images/icon.hpp
+./target/release/lumen-tools image photo.png --format argb8888 --output ../lumen/gfx/images/photo.hpp
+```
+
+```cpp
+#include "lumen/gfx/images/icon.hpp"
+#include "lumen/ui/widgets/image.hpp"
+
+lumen::ui::Image icon;
+icon.set_image_rgb565(lumen::assets::ICON_DATA, lumen::assets::ICON_W, lumen::assets::ICON_H);
+icon.set_bounds({10, 10, 50, 50});  // Image centered within bounds
 ```
 
 Built-in fonts: `font_6x8` (6x8 monospace, 760 bytes — always available).
