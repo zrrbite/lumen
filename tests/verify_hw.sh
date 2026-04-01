@@ -30,10 +30,10 @@ cmake --build "$BUILD_DIR" --target hw_test_f429 2>&1 | tail -3
 
 echo ""
 echo "=== Flashing ==="
-# Flash and run in background
-probe-rs run --chip "$CHIP" "$BINARY" &
-PID=$!
-sleep 2
+probe-rs download --chip "$CHIP" "$BINARY" 2>&1 | tail -2
+probe-rs reset --chip "$CHIP" 2>&1 || true
+echo "Waiting for firmware to complete..."
+sleep 3
 
 echo ""
 echo "=== Reading test results ==="
@@ -50,7 +50,7 @@ CTRL_ADDR=$(arm-none-eabi-nm "$BINARY" | grep "ctrl" | grep -v "crtc\|__" | head
 
 if [ -z "$CTRL_ADDR" ]; then
     echo "ERROR: Could not find ctrl struct address in binary"
-    kill $PID 2>/dev/null || true
+    
     exit 1
 fi
 
@@ -71,7 +71,7 @@ echo "magic=$MAGIC total=$TOTAL fb=0x$FB_ADDR ${FB_W}x${FB_H} bpp=$FB_BPP"
 
 if [ "$MAGIC" != "BEEFCAFE" ]; then
     echo "ERROR: Firmware not ready (magic=$MAGIC)"
-    kill $PID 2>/dev/null || true
+    
     exit 1
 fi
 
@@ -142,8 +142,8 @@ with open('$OUT_DIR/${NAME}.ppm', 'wb') as f:
 done
 
 # Clean up
-kill $PID 2>/dev/null || true
-wait $PID 2>/dev/null || true
+
+
 
 echo ""
 echo "=== Results ==="

@@ -24,9 +24,11 @@ cmake --build "$BUILD_DIR" --target integration_f429 2>&1 | tail -3
 
 echo ""
 echo "=== Flashing ==="
-probe-rs run --chip "$CHIP" "$BINARY" &
-PID=$!
-sleep 4
+# Flash and let firmware run, then release the probe for reads
+probe-rs download --chip "$CHIP" "$BINARY" 2>&1 | tail -2
+probe-rs reset --chip "$CHIP" 2>&1 || true
+echo "Waiting for firmware to complete..."
+sleep 3
 
 echo ""
 echo "=== Reading control block ==="
@@ -34,7 +36,7 @@ echo "=== Reading control block ==="
 CTRL_ADDR=$(arm-none-eabi-nm "$BINARY" | grep "ctrl" | grep -v "crtc\|__" | head -1 | awk '{print $1}')
 if [ -z "$CTRL_ADDR" ]; then
     echo "ERROR: Cannot find ctrl address"
-    kill $PID 2>/dev/null; wait $PID 2>/dev/null
+    true
     exit 1
 fi
 
@@ -52,7 +54,7 @@ echo "magic=$MAGIC steps=$STEP_COUNT fb=0x$FB_ADDR ${FB_W}x${FB_H} results=0x$RE
 
 if [ "$MAGIC" != "BEEFCAFE" ]; then
     echo "ERROR: Tests not complete (magic=$MAGIC)"
-    kill $PID 2>/dev/null; wait $PID 2>/dev/null
+    true
     exit 1
 fi
 
@@ -144,7 +146,7 @@ with open('$OUT_DIR/final_fb.ppm', 'wb') as f:
 print('Saved final framebuffer to $OUT_DIR/final_fb.ppm')
 " 2>/dev/null || true
 
-kill $PID 2>/dev/null; wait $PID 2>/dev/null
+true
 
 echo ""
 echo "=== Results ==="
