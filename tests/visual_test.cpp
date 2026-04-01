@@ -16,9 +16,17 @@
 #include "lumen/gfx/font.hpp"
 #include "lumen/gfx/fonts/liberation_sans_10.hpp"
 #include "lumen/gfx/fonts/liberation_sans_14.hpp"
+#include "lumen/gfx/fonts/liberation_sans_sdf16.hpp"
+#include "lumen/gfx/images/test_icon.hpp"
+#include "lumen/ui/transition.hpp"
 #include "lumen/ui/widgets/button.hpp"
+#include "lumen/ui/widgets/checkbox.hpp"
+#include "lumen/ui/widgets/image.hpp"
 #include "lumen/ui/widgets/label.hpp"
 #include "lumen/ui/widgets/progress_bar.hpp"
+#include "lumen/ui/widgets/scroll_list.hpp"
+#include "lumen/ui/widgets/slider.hpp"
+#include "lumen/ui/widgets/toggle.hpp"
 
 using namespace lumen;
 using namespace lumen::gfx;
@@ -185,12 +193,143 @@ static void test_multi_widget(Canvas<Rgb565>& canvas)
 	status.draw(canvas);
 }
 
+static void test_sdf_label(Canvas<Rgb565>& canvas)
+{
+	canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(20, 20, 30));
+	Label title("SDF Text!");
+	title.set_bounds({10, 10, 220, 32});
+	title.set_font(&liberation_sans_sdf16, 24);
+	title.set_color(Color::rgb(100, 200, 255));
+	title.set_bg_color(Color::rgb(20, 20, 30));
+	title.draw(canvas);
+
+	Label small("Small SDF");
+	small.set_bounds({10, 50, 220, 20});
+	small.set_font(&liberation_sans_sdf16, 12);
+	small.set_color(Color::white());
+	small.set_bg_color(Color::rgb(20, 20, 30));
+	small.draw(canvas);
+}
+
+static void test_image_widget(Canvas<Rgb565>& canvas)
+{
+	canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(20, 20, 30));
+	Image img;
+	img.set_image_rgb565(lumen::assets::TEST_ICON_DATA, lumen::assets::TEST_ICON_W, lumen::assets::TEST_ICON_H);
+	img.set_bounds({50, 50, 140, 80});
+	img.draw(canvas);
+}
+
+static void test_checkbox(Canvas<Rgb565>& canvas)
+{
+	canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(20, 20, 30));
+	Checkbox cb1;
+	cb1.set_bounds({20, 20, 200, 30});
+	cb1.draw(canvas);
+
+	Checkbox cb2;
+	cb2.set_bounds({20, 60, 200, 30});
+	// Simulate check
+	TouchEvent press{TouchEvent::Type::Press, {120, 75}};
+	TouchEvent release{TouchEvent::Type::Release, {120, 75}};
+	cb2.on_touch(press);
+	cb2.on_touch(release);
+	cb2.draw(canvas);
+}
+
+static void test_toggle(Canvas<Rgb565>& canvas)
+{
+	canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(20, 20, 30));
+	Toggle tog_off;
+	tog_off.set_bounds({20, 20, 60, 30});
+	tog_off.draw(canvas);
+
+	Toggle tog_on;
+	tog_on.set_bounds({20, 60, 60, 30});
+	TouchEvent press{TouchEvent::Type::Press, {50, 75}};
+	TouchEvent release{TouchEvent::Type::Release, {50, 75}};
+	tog_on.on_touch(press);
+	tog_on.on_touch(release);
+	tog_on.draw(canvas);
+}
+
+static void test_slider(Canvas<Rgb565>& canvas)
+{
+	canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(20, 20, 30));
+	Slider slider;
+	slider.set_bounds({20, 50, 200, 30});
+	slider.set_value(33);
+	slider.draw(canvas);
+}
+
+static void test_transition_wipe(Canvas<Rgb565>& canvas)
+{
+	// Simulate a wipe-down at 50% progress
+	TransitionState ts;
+	ts.start({TransitionType::WipeDown, Direction::Down, 300, ease::in_out_cubic}, 0, FB_W, FB_H);
+	ts.update(150); // 50% through
+
+	Rect in_clip  = ts.incoming_clip();
+	Rect out_clip = ts.outgoing_clip();
+
+	// "Old screen" = red
+	canvas.set_clip(out_clip);
+	canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(200, 50, 50));
+
+	// "New screen" = blue
+	canvas.set_clip(in_clip);
+	canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(50, 50, 200));
+
+	canvas.set_clip({0, 0, FB_W, FB_H}); // Reset
+}
+
+static void test_scroll_list(Canvas<Rgb565>& canvas)
+{
+	canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(20, 20, 30));
+	ScrollList list;
+	list.set_bounds({10, 10, 220, 200});
+	list.set_font(&liberation_sans_10);
+	for (int i = 0; i < 10; ++i)
+	{
+		char buf[32];
+		snprintf(buf, sizeof(buf), "Item %d", i + 1);
+		list.add_item(buf);
+	}
+	list.set_selected(2);
+	list.draw(canvas);
+}
+
+static void test_scroll_list_scrolled(Canvas<Rgb565>& canvas)
+{
+	canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(20, 20, 30));
+	ScrollList list;
+	list.set_bounds({10, 10, 220, 120});
+	list.set_font(&liberation_sans_10);
+	for (int i = 0; i < 15; ++i)
+	{
+		char buf[32];
+		snprintf(buf, sizeof(buf), "Entry %d - Long text", i + 1);
+		list.add_item(buf);
+	}
+	list.set_selected(7);
+	list.set_scroll_offset(100);
+	list.draw(canvas);
+}
+
 static TestCase tests[] = {
 	{"label", test_label},
 	{"button", test_button},
 	{"button_pressed", test_button_pressed},
 	{"progress_bar", test_progress_bar},
 	{"multi_widget", test_multi_widget},
+	{"sdf_label", test_sdf_label},
+	{"image_widget", test_image_widget},
+	{"checkbox", test_checkbox},
+	{"toggle", test_toggle},
+	{"slider", test_slider},
+	{"transition_wipe", test_transition_wipe},
+	{"scroll_list", test_scroll_list},
+	{"scroll_list_scrolled", test_scroll_list_scrolled},
 };
 
 int main(int argc, char** argv)
