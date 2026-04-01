@@ -46,6 +46,25 @@ struct Theme
 
 	/// Default dark theme.
 	static Theme dark() { return {}; }
+
+	/// Light theme.
+	static Theme light()
+	{
+		Theme t;
+		t.background	 = Color::rgb(240, 240, 245);
+		t.label			 = {Color::rgb(240, 240, 245), Color::rgb(20, 20, 30), {}, 0, 0, 2};
+		t.button_normal	 = {Color::rgb(50, 120, 220), Color::white(), Color::rgb(40, 100, 200), 1, 0, 4};
+		t.button_pressed = {Color::rgb(30, 90, 170), Color::white(), Color::rgb(20, 70, 140), 1, 0, 4};
+		t.checkbox_off	 = {Color::rgb(200, 200, 210), Color::rgb(60, 60, 70), Color::rgb(160, 160, 170), 2, 0, 0};
+		t.checkbox_on	 = {Color::rgb(50, 160, 80), Color::white(), Color::rgb(70, 180, 100), 2, 0, 0};
+		t.slider_track	 = {Color::rgb(200, 200, 210), {}, Color::rgb(170, 170, 180), 1, 0, 0};
+		t.slider_knob	 = {Color::rgb(50, 120, 220), {}, Color::rgb(40, 100, 200), 1, 0, 0};
+		t.progress_bg	 = {Color::rgb(200, 200, 210), {}, Color::rgb(180, 180, 190), 1, 0, 0};
+		t.progress_fill	 = {Color::rgb(50, 180, 80), {}, {}, 0, 0, 0};
+		t.toggle_off	 = {Color::rgb(180, 180, 190), Color::rgb(240, 240, 245), {}, 0, 0, 0};
+		t.toggle_on		 = {Color::rgb(50, 160, 80), Color::white(), {}, 0, 0, 0};
+		return t;
+	}
 };
 
 } // namespace lumen::ui

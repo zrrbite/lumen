@@ -18,6 +18,7 @@
 #include "lumen/gfx/fonts/liberation_sans_14.hpp"
 #include "lumen/gfx/fonts/liberation_sans_sdf16.hpp"
 #include "lumen/gfx/images/test_icon.hpp"
+#include "lumen/ui/style.hpp"
 #include "lumen/ui/transition.hpp"
 #include "lumen/ui/widgets/button.hpp"
 #include "lumen/ui/widgets/checkbox.hpp"
@@ -330,6 +331,48 @@ static TestCase tests[] = {
 	{"transition_wipe", test_transition_wipe},
 	{"scroll_list", test_scroll_list},
 	{"scroll_list_scrolled", test_scroll_list_scrolled},
+	{"theme_dark",
+	 [](Canvas<Rgb565>& canvas) {
+		 Theme theme = Theme::dark();
+		 canvas.fill_rect({0, 0, FB_W, FB_H}, theme.background);
+		 Label title("Dark Theme");
+		 title.set_bounds({10, 10, 220, 24});
+		 title.set_font(&liberation_sans_14);
+		 title.set_color(theme.label.fg_color);
+		 title.set_bg_color(theme.label.bg_color);
+		 title.draw(canvas);
+		 Button btn("Button");
+		 btn.set_bounds({20, 50, 200, 50});
+		 btn.set_font(&liberation_sans_10);
+		 btn.set_color(theme.button_normal.bg_color, theme.button_pressed.bg_color);
+		 btn.draw(canvas);
+		 ProgressBar bar;
+		 bar.set_bounds({20, 120, 200, 16});
+		 bar.set_fill_color(theme.progress_fill.bg_color);
+		 bar.set_value(60);
+		 bar.draw(canvas);
+	 }},
+	{"theme_light",
+	 [](Canvas<Rgb565>& canvas) {
+		 Theme theme = Theme::light();
+		 canvas.fill_rect({0, 0, FB_W, FB_H}, theme.background);
+		 Label title("Light Theme");
+		 title.set_bounds({10, 10, 220, 24});
+		 title.set_font(&liberation_sans_14);
+		 title.set_color(theme.label.fg_color);
+		 title.set_bg_color(theme.label.bg_color);
+		 title.draw(canvas);
+		 Button btn("Button");
+		 btn.set_bounds({20, 50, 200, 50});
+		 btn.set_font(&liberation_sans_10);
+		 btn.set_color(theme.button_normal.bg_color, theme.button_pressed.bg_color);
+		 btn.draw(canvas);
+		 ProgressBar bar;
+		 bar.set_bounds({20, 120, 200, 16});
+		 bar.set_fill_color(theme.progress_fill.bg_color);
+		 bar.set_value(60);
+		 bar.draw(canvas);
+	 }},
 };
 
 int main(int argc, char** argv)
