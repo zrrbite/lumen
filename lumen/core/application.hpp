@@ -19,11 +19,8 @@ template <typename BoardConfig> class Application
   public:
 	explicit Application(BoardConfig& board) : board_(board) {}
 
-	/// Navigate to a new screen with an instant transition.
-	void navigate_to(ui::Screen& screen) { navigate_to(screen, ui::transitions::instant()); }
-
 	/// Navigate to a new screen with a transition animation.
-	void navigate_to(ui::Screen& screen, const ui::Transition& trans)
+	void navigate_to(ui::Screen& screen, ui::Transition trans)
 	{
 		if (trans.type == ui::TransitionType::Instant)
 		{
@@ -45,6 +42,9 @@ template <typename BoardConfig> class Application
 			dirty_.add({0, 0, BoardConfig::Display::width(), BoardConfig::Display::height()});
 		}
 	}
+
+	/// Navigate with instant transition (convenience overload).
+	void navigate_to(ui::Screen& screen) { navigate_to(screen, ui::Transition{}); }
 
 	/// Run the main loop. Never returns.
 	void run()
@@ -231,12 +231,62 @@ template <typename BoardConfig> class Application
 
 					Rect band{dirty.x, band_y, dirty.w, h};
 					gfx::Canvas<PF> canvas(scratch, dirty.w, h);
-					// Set origin so widgets drawing in screen coordinates
-					// map correctly into the scratch buffer
-					canvas.set_origin(dirty.x, band_y);
-					canvas.set_clip(band);
 
-					active_screen_->draw(canvas);
+					if (in_transition && outgoing_screen_)
+					{
+						auto& tr  = transition_;
+						auto type = tr.transition().type;
+
+						if (type == ui::TransitionType::SlideBoth || type == ui::TransitionType::SlideIn ||
+							type == ui::TransitionType::SlideOut)
+						{
+							// Draw outgoing with offset
+							Point out_off = tr.outgoing_offset();
+							canvas.set_origin(static_cast<int16_t>(dirty.x - out_off.x),
+											  static_cast<int16_t>(band_y - out_off.y));
+							canvas.set_clip(band);
+							outgoing_screen_->draw(canvas);
+
+							// Draw incoming with offset (overwrites where it overlaps)
+							Point in_off = tr.incoming_offset();
+							canvas.set_origin(static_cast<int16_t>(dirty.x - in_off.x),
+											  static_cast<int16_t>(band_y - in_off.y));
+							canvas.set_clip(band);
+							active_screen_->draw(canvas);
+						}
+						else if (type == ui::TransitionType::WipeDown || type == ui::TransitionType::WipeRight)
+						{
+							// Outgoing for its clip region
+							Rect out_clip = tr.outgoing_clip().intersection(band);
+							if (!out_clip.empty())
+							{
+								canvas.set_origin(dirty.x, band_y);
+								canvas.set_clip(out_clip);
+								outgoing_screen_->draw(canvas);
+							}
+							// Incoming for its clip region
+							Rect in_clip = tr.incoming_clip().intersection(band);
+							if (!in_clip.empty())
+							{
+								canvas.set_origin(dirty.x, band_y);
+								canvas.set_clip(in_clip);
+								active_screen_->draw(canvas);
+							}
+						}
+						else
+						{
+							// Fallback: just draw incoming
+							canvas.set_origin(dirty.x, band_y);
+							canvas.set_clip(band);
+							active_screen_->draw(canvas);
+						}
+					}
+					else
+					{
+						canvas.set_origin(dirty.x, band_y);
+						canvas.set_clip(band);
+						active_screen_->draw(canvas);
+					}
 
 					board_.display.set_window(band);
 					board_.display.write_pixels(scratch, band_pixels);
