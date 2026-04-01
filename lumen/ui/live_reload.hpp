@@ -18,6 +18,7 @@
 
 #include <cstring>
 
+#include "lumen/ui/script.hpp"
 #include "lumen/ui/widget_registry.hpp"
 
 namespace lumen::ui {
@@ -26,7 +27,7 @@ namespace lumen::ui {
 class LiveReload
 {
   public:
-	explicit LiveReload(WidgetRegistry& registry) : registry_(registry) {}
+	explicit LiveReload(WidgetRegistry& registry) : registry_(registry), script_(registry) {}
 
 	/// Feed a single byte from UART. Processes command when newline received.
 	/// Returns true if a command was executed.
@@ -66,10 +67,14 @@ class LiveReload
 	using ResponseFn = void (*)(const char* text);
 	void set_response_callback(ResponseFn fn) { response_fn_ = fn; }
 
+	/// Access the script engine for programmatic use.
+	ScriptEngine& script() { return script_; }
+
   private:
 	static constexpr uint16_t MAX_CMD = 128;
 
 	WidgetRegistry& registry_;
+	ScriptEngine script_;
 	char buf_[MAX_CMD]{};
 	uint16_t buf_pos_		= 0;
 	ResponseFn response_fn_ = nullptr;
@@ -93,6 +98,13 @@ class LiveReload
 		else if (std::strncmp(cmd, "PING", 4) == 0)
 		{
 			respond("PONG\n");
+		}
+		else if (std::strncmp(cmd, "RUN ", 4) == 0)
+		{
+			if (script_.exec(cmd + 4))
+				respond("OK\n");
+			else
+				respond("ERR script\n");
 		}
 		else if (std::strncmp(cmd, "LIST", 4) == 0)
 		{
