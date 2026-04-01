@@ -250,6 +250,78 @@ RUN if counter > 0 { title.text = "Active" }
 - String literals use a single static buffer (one string value at a time)
 - No loops, no functions — just sequential statements
 
+## Testing
+
+### Run everything
+
+```bash
+./tests/run_all.sh
+```
+
+Runs build verification (all platforms), unit tests, visual regression, and Rust tooling — one command, exit 0 = all pass.
+
+### Unit tests
+
+Lightweight GTest-style framework in `tests/test.hpp`:
+
+```cpp
+#include "tests/test.hpp"
+
+TEST(my_feature) {
+    EXPECT_EQ(1 + 1, 2);
+    EXPECT_TRUE(some_condition);
+    EXPECT_STREQ(str, "expected");
+}
+
+int main() { return lumen_test::run_all(); }
+```
+
+Macros: `EXPECT_TRUE`, `EXPECT_FALSE`, `EXPECT_EQ`, `EXPECT_NE`, `EXPECT_GT`, `EXPECT_LT`, `EXPECT_GE`, `EXPECT_LE`, `EXPECT_STREQ`.
+
+Existing test suites:
+- `test_script` — 30 tests: variables, arithmetic, comparisons, logic, if/else, widget properties
+- `test_gesture` — 8 tests: tap, long press, swipe (4 directions), edge cases
+
+Add new test files to `CMakeLists.txt`:
+```cmake
+add_executable(test_myfeature tests/test_myfeature.cpp)
+target_include_directories(test_myfeature PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(test_myfeature PRIVATE cxx_std_17)
+```
+
+### Visual regression tests
+
+Renders widgets to an in-memory framebuffer, saves PPM screenshots, compares pixel-by-pixel:
+
+```bash
+./build/visual_test              # Compare against references (exit 0 = pass)
+./build/visual_test --update     # Regenerate reference screenshots
+```
+
+15 test cases: label, button, button_pressed, progress_bar, multi_widget, sdf_label, image_widget, checkbox, toggle, slider, transition_wipe, scroll_list, scroll_list_scrolled, theme_dark, theme_light.
+
+Add new visual tests in `tests/visual_test.cpp`:
+```cpp
+static void test_my_widget(Canvas<Rgb565>& canvas) {
+    canvas.fill_rect({0, 0, FB_W, FB_H}, Color::rgb(20, 20, 30));
+    // ... render widgets ...
+}
+
+// Add to tests[] array:
+{"my_widget", test_my_widget},
+```
+
+Then run `--update` to generate the reference, and subsequent runs verify it.
+
+### Hardware-in-the-loop (needs STM32F429 connected)
+
+```bash
+./tests/verify_hw.sh --update   # Generate hardware references
+./tests/verify_hw.sh            # Compare against references
+```
+
+Flashes test firmware, reads framebuffer via `probe-rs read`, compares PPM screenshots.
+
 ## Code Style
 
 - C++17, no exceptions, no RTTI on embedded
