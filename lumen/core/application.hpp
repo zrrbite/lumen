@@ -7,6 +7,7 @@
 #include "lumen/gfx/dirty_manager.hpp"
 #include "lumen/hal/touch_driver.hpp"
 #include "lumen/ui/screen.hpp"
+#include "lumen/ui/transition.hpp"
 
 namespace lumen {
 
@@ -18,17 +19,31 @@ template <typename BoardConfig> class Application
   public:
 	explicit Application(BoardConfig& board) : board_(board) {}
 
-	/// Set the active screen.
-	void navigate_to(ui::Screen& screen)
+	/// Navigate to a new screen with an instant transition.
+	void navigate_to(ui::Screen& screen) { navigate_to(screen, ui::transitions::instant()); }
+
+	/// Navigate to a new screen with a transition animation.
+	void navigate_to(ui::Screen& screen, const ui::Transition& trans)
 	{
-		if (active_screen_)
+		if (trans.type == ui::TransitionType::Instant)
 		{
-			active_screen_->on_leave();
+			// Instant: switch immediately
+			if (active_screen_)
+				active_screen_->on_leave();
+			active_screen_ = &screen;
+			active_screen_->on_enter();
+			dirty_.add({0, 0, BoardConfig::Display::width(), BoardConfig::Display::height()});
 		}
-		active_screen_ = &screen;
-		active_screen_->on_enter();
-		// Force full redraw
-		dirty_.add({0, 0, BoardConfig::Display::width(), BoardConfig::Display::height()});
+		else
+		{
+			// Animated: keep both screens alive during transition
+			outgoing_screen_ = active_screen_;
+			active_screen_	 = &screen;
+			active_screen_->on_enter();
+			transition_.start(trans, board_.tick.now(), BoardConfig::Display::width(), BoardConfig::Display::height());
+			// Force full redraw every frame during transition
+			dirty_.add({0, 0, BoardConfig::Display::width(), BoardConfig::Display::height()});
+		}
 	}
 
 	/// Run the main loop. Never returns.
@@ -52,9 +67,11 @@ template <typename BoardConfig> class Application
   private:
 	BoardConfig& board_;
 	Scheduler scheduler_;
-	ui::Screen* active_screen_ = nullptr;
+	ui::Screen* active_screen_	 = nullptr;
+	ui::Screen* outgoing_screen_ = nullptr;
 	gfx::DirtyManager dirty_;
 	PerfStats perf_{};
+	ui::TransitionState transition_;
 
 	// Track touch state for press/release detection
 	bool was_touching_ = false;
@@ -136,11 +153,32 @@ template <typename BoardConfig> class Application
 			perf_.fps_last_tick_   = frame_start;
 		}
 
+		// Handle transition
+		bool in_transition = transition_.is_active();
+		if (in_transition)
+		{
+			transition_.update(board_.tick.now());
+			if (!transition_.is_active())
+			{
+				// Transition complete
+				if (outgoing_screen_)
+					outgoing_screen_->on_leave();
+				outgoing_screen_ = nullptr;
+				in_transition	 = false;
+			}
+			// Force full redraw every frame during transition
+			dirty_.add({0, 0, BoardConfig::Display::width(), BoardConfig::Display::height()});
+		}
+
 		// Update model
 		active_screen_->update_model();
+		if (in_transition && outgoing_screen_)
+			outgoing_screen_->update_model();
 
 		// Collect dirty regions from widgets
 		collect_dirty(*active_screen_);
+		if (in_transition && outgoing_screen_)
+			collect_dirty(*outgoing_screen_);
 
 		if (!dirty_.has_dirty())
 			return;
