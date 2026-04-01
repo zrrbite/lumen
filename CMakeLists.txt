@@ -78,6 +78,16 @@ if(NOT CMAKE_CROSSCOMPILING)
     target_compile_features(visual_test PRIVATE cxx_std_17)
 endif()
 
+# STM32F429 hardware-in-the-loop test
+if(CMAKE_CROSSCOMPILING AND LUMEN_TARGET_F429)
+    add_executable(hw_test_f429 tests/hw_test_f429.cpp)
+    target_link_libraries(hw_test_f429 PRIVATE -Wl,--whole-archive stm32f429_disco -Wl,--no-whole-archive)
+    add_custom_command(TARGET hw_test_f429 POST_BUILD
+        COMMAND ${CMAKE_SIZE} $<TARGET_FILE:hw_test_f429>
+        COMMENT "HW test binary size"
+    )
+endif()
+
 # STM32F769 platform (cross-compilation only)
 if(CMAKE_CROSSCOMPILING AND LUMEN_TARGET_F769)
     add_subdirectory(platform/stm32f769_disco)
