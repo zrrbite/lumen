@@ -183,6 +183,62 @@ PING
 
 Requires WidgetRegistry with named widgets. See `examples/stm32f429_hello/`.
 
+## Scripting Engine
+
+Lumen includes a tiny expression evaluator for field-updatable UI logic. No heap, runs on MCU.
+
+### Variables and expressions
+```
+RUN counter = 0
+RUN counter += 1
+RUN x = counter * 10 + 5
+RUN result = (a + b) / 2
+```
+
+### Widget property access
+```
+RUN bar.value = counter * 10
+RUN title.text = "Hello!"
+RUN title.color = 255,100,50
+RUN btn.visible = 0
+```
+Widget names come from the WidgetRegistry — register widgets with `registry.add("name", widget)`.
+
+### Conditionals
+```
+RUN if counter > 10 { counter = 0 }
+RUN if x == 0 { title.text = "Zero" } else { title.text = "Nonzero" }
+```
+
+### Operators
+Arithmetic: `+`, `-`, `*`, `/`, `%`
+Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
+Logic: `&&`, `||`, `!`
+Assignment: `=`, `+=`, `-=`, `*=`
+
+### Button script binding
+```cpp
+// Define a runner that forwards to your ScriptEngine
+static ScriptEngine* g_script;
+static void run_script(const char* s) { g_script->exec(s); }
+
+// Bind script to button — runs on each click
+btn.set_on_click_script("counter += 1; bar.value = counter * 10", run_script);
+```
+
+### Over UART (live reload)
+```
+RUN counter = 42
+RUN bar.value = 100
+RUN if counter > 0 { title.text = "Active" }
+```
+
+### Limits
+- 32 variables max (fixed-size, no heap)
+- 128 chars max per statement
+- String literals use a single static buffer (one string value at a time)
+- No loops, no functions — just sequential statements
+
 ## Code Style
 
 - C++17, no exceptions, no RTTI on embedded
