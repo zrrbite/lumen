@@ -71,11 +71,19 @@ if(NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND LUMEN_TAR
     target_link_libraries(rpi_hello PRIVATE pthread)
 endif()
 
-# Visual regression tests (desktop only, no SDL2 needed)
+# Tests (desktop only, no SDL2 needed)
 if(NOT CMAKE_CROSSCOMPILING)
     add_executable(visual_test tests/visual_test.cpp src/gfx/font_6x8.cpp)
     target_include_directories(visual_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_features(visual_test PRIVATE cxx_std_17)
+
+    add_executable(test_script tests/test_script.cpp src/gfx/font_6x8.cpp)
+    target_include_directories(test_script PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_features(test_script PRIVATE cxx_std_17)
+
+    add_executable(test_gesture tests/test_gesture.cpp)
+    target_include_directories(test_gesture PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_features(test_gesture PRIVATE cxx_std_17)
 endif()
 
 # STM32F429 hardware-in-the-loop test

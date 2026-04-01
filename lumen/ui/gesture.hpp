@@ -61,16 +61,19 @@ class GestureDetector
 			break;
 
 		case TouchEvent::Type::Move:
+		{
 			if (!active_)
 				break;
-			last_	   = event.pos;
-			int16_t dx = static_cast<int16_t>(last_.x - start_.x);
-			int16_t dy = static_cast<int16_t>(last_.y - start_.y);
-			if (abs_i16(dx) > swipe_threshold || abs_i16(dy) > swipe_threshold)
+			last_		= event.pos;
+			int16_t mdx = static_cast<int16_t>(last_.x - start_.x);
+			int16_t mdy = static_cast<int16_t>(last_.y - start_.y);
+			if (abs_i16(mdx) > swipe_threshold || abs_i16(mdy) > swipe_threshold)
 				moved_ = true;
 			break;
+		}
 
 		case TouchEvent::Type::Release:
+		{
 			if (!active_)
 				break;
 			last_		   = event.pos;
@@ -82,12 +85,13 @@ class GestureDetector
 			}
 			else if (moved_)
 			{
-				int16_t dx = static_cast<int16_t>(last_.x - start_.x);
-				int16_t dy = static_cast<int16_t>(last_.y - start_.y);
-				fire({swipe_direction(dx, dy), start_, last_, elapsed});
+				int16_t rdx = static_cast<int16_t>(last_.x - start_.x);
+				int16_t rdy = static_cast<int16_t>(last_.y - start_.y);
+				fire({swipe_direction(rdx, rdy), start_, last_, elapsed});
 			}
 			active_ = false;
 			break;
+		}
 		}
 	}
 
