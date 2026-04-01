@@ -186,10 +186,10 @@ template <typename BoardConfig> class Application
 		TickMs render_start = board_.tick.now();
 
 		// Render — adapt to boards with or without framebuffer
-		using PF				  = typename BoardConfig::PixFmt;
-		using pixel_t			  = typename PF::pixel_t;
-		constexpr uint16_t disp_w = BoardConfig::Display::width();
-		constexpr uint16_t disp_h = BoardConfig::Display::height();
+		using PF		= typename BoardConfig::PixFmt;
+		using pixel_t	= typename PF::pixel_t;
+		uint16_t disp_w = BoardConfig::Display::width();
+		uint16_t disp_h = BoardConfig::Display::height();
 
 		if constexpr (BoardConfig::framebuffer_count > 0)
 		{

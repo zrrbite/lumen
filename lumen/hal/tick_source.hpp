@@ -13,7 +13,7 @@
 
 #include "lumen/core/types.hpp"
 
-#if defined(LUMEN_PLATFORM_DESKTOP)
+#if defined(LUMEN_PLATFORM_DESKTOP) || defined(__linux__) || defined(_WIN32) || defined(__APPLE__)
 #include <chrono>
 #include <thread>
 #endif
