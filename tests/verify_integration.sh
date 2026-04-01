@@ -24,8 +24,21 @@ cmake --build "$BUILD_DIR" --target integration_f429 2>&1 | tail -3
 
 echo ""
 echo "=== Flashing ==="
-# Flash and let firmware run, then release the probe for reads
-probe-rs download --chip "$CHIP" "$BINARY" 2>&1 | tail -2
+# Kill any leftover probe-rs processes
+killall -q probe-rs 2>/dev/null || true
+sleep 1
+
+# Flash with retry
+for attempt in 1 2 3; do
+    if probe-rs download --chip "$CHIP" "$BINARY" 2>&1 | tail -2; then
+        break
+    fi
+    echo "Flash attempt $attempt failed, retrying..."
+    killall -q probe-rs 2>/dev/null || true
+    sleep 2
+done
+
+# Reset and let firmware run
 probe-rs reset --chip "$CHIP" 2>&1 || true
 echo "Waiting for firmware to complete..."
 sleep 3

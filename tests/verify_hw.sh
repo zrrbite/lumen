@@ -30,7 +30,18 @@ cmake --build "$BUILD_DIR" --target hw_test_f429 2>&1 | tail -3
 
 echo ""
 echo "=== Flashing ==="
-probe-rs download --chip "$CHIP" "$BINARY" 2>&1 | tail -2
+killall -q probe-rs 2>/dev/null || true
+sleep 1
+
+for attempt in 1 2 3; do
+    if probe-rs download --chip "$CHIP" "$BINARY" 2>&1 | tail -2; then
+        break
+    fi
+    echo "Flash attempt $attempt failed, retrying..."
+    killall -q probe-rs 2>/dev/null || true
+    sleep 2
+done
+
 probe-rs reset --chip "$CHIP" 2>&1 || true
 echo "Waiting for firmware to complete..."
 sleep 3
