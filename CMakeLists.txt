@@ -62,6 +62,13 @@ if(CMAKE_CROSSCOMPILING AND LUMEN_TARGET_F429)
     )
 endif()
 
+# Visual regression tests (desktop only, no SDL2 needed)
+if(NOT CMAKE_CROSSCOMPILING)
+    add_executable(visual_test tests/visual_test.cpp src/gfx/font_6x8.cpp)
+    target_include_directories(visual_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_features(visual_test PRIVATE cxx_std_17)
+endif()
+
 # STM32F769 platform (cross-compilation only)
 if(CMAKE_CROSSCOMPILING AND LUMEN_TARGET_F769)
     add_subdirectory(platform/stm32f769_disco)
