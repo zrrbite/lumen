@@ -6,9 +6,11 @@
 #include "lumen/gfx/fonts/liberation_sans_14.hpp"
 #include "lumen/gfx/fonts/liberation_sans_bold_10.hpp"
 #include "lumen/gfx/fonts/liberation_sans_sdf16.hpp"
+#include "lumen/gfx/images/test_icon.hpp"
 #include "lumen/ui/screen.hpp"
 #include "lumen/ui/transition.hpp"
 #include "lumen/ui/widgets/button.hpp"
+#include "lumen/ui/widgets/image.hpp"
 #include "lumen/ui/widgets/label.hpp"
 #include "lumen/ui/widgets/progress_bar.hpp"
 #include "platform/stm32f429_disco/board_config.hpp"
@@ -60,6 +62,9 @@ class ScreenA : public lumen::ui::Screen
 		wipe_.set_color(lumen::Color::rgb(40, 120, 80), lumen::Color::rgb(30, 90, 60));
 		wipe_.set_on_click(nav_wipe_to_b);
 
+		icon_.set_image_rgb565(lumen::assets::TEST_ICON_DATA, lumen::assets::TEST_ICON_W, lumen::assets::TEST_ICON_H);
+		icon_.set_bounds({170, 50, 50, 40});
+
 		perf_.set_text("FPS: --");
 		perf_.set_bounds({10, 260, 220, 16});
 		perf_.set_font(&lumen::gfx::liberation_sans_10);
@@ -68,6 +73,7 @@ class ScreenA : public lumen::ui::Screen
 
 		add(title_);
 		add(info_);
+		add(icon_);
 		add(bar_);
 		add(next_);
 		add(wipe_);
@@ -96,6 +102,7 @@ class ScreenA : public lumen::ui::Screen
   private:
 	lumen::ui::Label title_;
 	lumen::ui::Label info_;
+	lumen::ui::Image icon_;
 	lumen::ui::ProgressBar bar_;
 	lumen::ui::Button next_;
 	lumen::ui::Button wipe_;
