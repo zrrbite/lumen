@@ -31,7 +31,7 @@ sleep 4
 echo ""
 echo "=== Reading control block ==="
 
-CTRL_ADDR=$(arm-none-eabi-nm "$BINARY" | grep " b ctrl$\| B ctrl$\| d ctrl$\| D ctrl$" | head -1 | awk '{print $1}')
+CTRL_ADDR=$(arm-none-eabi-nm "$BINARY" | grep "ctrl" | grep -v "crtc\|__" | head -1 | awk '{print $1}')
 if [ -z "$CTRL_ADDR" ]; then
     echo "ERROR: Cannot find ctrl address"
     kill $PID 2>/dev/null; wait $PID 2>/dev/null

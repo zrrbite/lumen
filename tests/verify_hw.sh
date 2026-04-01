@@ -46,11 +46,7 @@ echo "=== Reading test results ==="
 # ctrl is in BSS which starts after .data in SRAM
 # We'll try to read from where the linker placed it
 # Actually, probe-rs read needs the address. Let's use nm to find it:
-CTRL_ADDR=$(arm-none-eabi-nm "$BINARY" | grep " ctrl$" | awk '{print $1}')
-if [ -z "$CTRL_ADDR" ]; then
-    # Fallback: try with 'b' or 'd' type
-    CTRL_ADDR=$(arm-none-eabi-nm "$BINARY" | grep "ctrl" | head -1 | awk '{print $1}')
-fi
+CTRL_ADDR=$(arm-none-eabi-nm "$BINARY" | grep "ctrl" | grep -v "crtc\|__" | head -1 | awk '{print $1}')
 
 if [ -z "$CTRL_ADDR" ]; then
     echo "ERROR: Could not find ctrl struct address in binary"
