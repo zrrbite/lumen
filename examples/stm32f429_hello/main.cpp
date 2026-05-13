@@ -66,10 +66,10 @@ class ScreenA : public lumen::ui::Screen
 		icon_.set_bounds({170, 50, 50, 40});
 
 		perf_.set_text("FPS: --");
-		perf_.set_bounds({10, 260, 220, 16});
-		perf_.set_font(&lumen::gfx::liberation_sans_10);
-		perf_.set_color(lumen::Color::rgb(80, 80, 100));
-		perf_.set_bg_color(lumen::Color::rgb(20, 30, 60));
+		perf_.set_bounds({10, 260, 220, 20});
+		perf_.set_font(&lumen::gfx::liberation_sans_14);
+		perf_.set_color(lumen::Color::rgb(255, 255, 0));
+		perf_.set_bg_color(lumen::Color::rgb(0, 0, 0));
 
 		add(title_);
 		add(info_);
@@ -88,13 +88,17 @@ class ScreenA : public lumen::ui::Screen
 		{
 			char buf[32];
 			auto fps = g_app->perf().fps;
+			auto rt	 = g_app->perf().render_time_ms;
 			buf[0]	 = 'F';
-			buf[1]	 = 'P';
-			buf[2]	 = 'S';
-			buf[3]	 = ':';
-			buf[4]	 = '0' + (fps / 10) % 10;
-			buf[5]	 = '0' + fps % 10;
-			buf[6]	 = '\0';
+			buf[1]	 = '0' + (fps / 100) % 10;
+			buf[2]	 = '0' + (fps / 10) % 10;
+			buf[3]	 = '0' + fps % 10;
+			buf[4]	 = ' ';
+			buf[5]	 = 'R';
+			buf[6]	 = '0' + (rt / 100) % 10;
+			buf[7]	 = '0' + (rt / 10) % 10;
+			buf[8]	 = '0' + rt % 10;
+			buf[9]	 = '\0';
 			perf_.set_text(buf);
 		}
 	}
@@ -142,10 +146,10 @@ class ScreenB : public lumen::ui::Screen
 		wipe_.set_on_click(nav_wipe_to_a);
 
 		perf_.set_text("FPS: --");
-		perf_.set_bounds({10, 260, 220, 16});
-		perf_.set_font(&lumen::gfx::liberation_sans_10);
-		perf_.set_color(lumen::Color::rgb(100, 80, 80));
-		perf_.set_bg_color(lumen::Color::rgb(50, 20, 20));
+		perf_.set_bounds({10, 260, 220, 20});
+		perf_.set_font(&lumen::gfx::liberation_sans_14);
+		perf_.set_color(lumen::Color::rgb(255, 255, 0));
+		perf_.set_bg_color(lumen::Color::rgb(0, 0, 0));
 
 		add(title_);
 		add(info_);
@@ -163,13 +167,17 @@ class ScreenB : public lumen::ui::Screen
 		{
 			char buf[32];
 			auto fps = g_app->perf().fps;
+			auto rt	 = g_app->perf().render_time_ms;
 			buf[0]	 = 'F';
-			buf[1]	 = 'P';
-			buf[2]	 = 'S';
-			buf[3]	 = ':';
-			buf[4]	 = '0' + (fps / 10) % 10;
-			buf[5]	 = '0' + fps % 10;
-			buf[6]	 = '\0';
+			buf[1]	 = '0' + (fps / 100) % 10;
+			buf[2]	 = '0' + (fps / 10) % 10;
+			buf[3]	 = '0' + fps % 10;
+			buf[4]	 = ' ';
+			buf[5]	 = 'R';
+			buf[6]	 = '0' + (rt / 100) % 10;
+			buf[7]	 = '0' + (rt / 10) % 10;
+			buf[8]	 = '0' + rt % 10;
+			buf[9]	 = '\0';
 			perf_.set_text(buf);
 		}
 	}

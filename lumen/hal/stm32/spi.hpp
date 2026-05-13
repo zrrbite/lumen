@@ -119,7 +119,91 @@ template <SpiInstance Inst> struct Spi
 		regs()->CR1 |= (1U << 6);	// Enable SPE
 	}
 
-	static constexpr bool has_dma = false; // TODO: add DMA support
+	static constexpr bool has_dma = (Inst == SpiInstance::SPI5);
+
+	/// Enable DMA2 clock (for SPI5 TX via DMA2 Stream 4).
+	static void enable_dma_clock()
+	{
+		static_assert(Inst == SpiInstance::SPI5, "DMA only implemented for SPI5");
+		volatile uint32_t* rcc_ahb1enr = reinterpret_cast<volatile uint32_t*>(0x40023830);
+		*rcc_ahb1enr |= (1U << 22); // DMA2EN
+	}
+
+	/// Start async 16-bit DMA transfer to SPI. Call transmit16_wait() when done.
+	/// DMA2 Stream 4, Channel 2 = SPI5_TX.
+	static void transmit16_start(const uint16_t* data, uint32_t count)
+	{
+		static_assert(Inst == SpiInstance::SPI5, "DMA only implemented for SPI5");
+
+		// Switch to 16-bit SPI mode
+		regs()->CR1 &= ~(1U << 6); // Disable SPE
+		regs()->CR1 |= (1U << 11); // DFF: 16-bit
+		regs()->CR1 |= (1U << 6);  // Enable SPE
+
+		// DMA2 Stream 4 registers
+		static constexpr uint32_t DMA2_BASE		 = 0x40026400;
+		static constexpr uint32_t STREAM4_OFFSET = 0x70;
+		auto* s4cr	 = reinterpret_cast<volatile uint32_t*>(DMA2_BASE + STREAM4_OFFSET + 0x00);
+		auto* s4ndtr = reinterpret_cast<volatile uint32_t*>(DMA2_BASE + STREAM4_OFFSET + 0x04);
+		auto* s4par	 = reinterpret_cast<volatile uint32_t*>(DMA2_BASE + STREAM4_OFFSET + 0x08);
+		auto* s4m0ar = reinterpret_cast<volatile uint32_t*>(DMA2_BASE + STREAM4_OFFSET + 0x0C);
+		auto* hifcr	 = reinterpret_cast<volatile uint32_t*>(DMA2_BASE + 0x0C);
+
+		// Disable stream and wait
+		*s4cr = 0;
+		while (*s4cr & 1U)
+		{}
+
+		// Clear all interrupt flags for Stream 4 (bits 0,2,3,4,5 of HIFCR)
+		*hifcr = 0x3DU;
+
+		// Configure: Channel 2, mem-to-periph, 16-bit, memory increment
+		*s4par	= reinterpret_cast<uint32_t>(&regs()->DR);
+		*s4m0ar = reinterpret_cast<uint32_t>(data);
+		*s4ndtr = count;
+		*s4cr	= (2U << 25) // CHSEL = 2 (SPI5_TX)
+				| (1U << 13) // MSIZE = 16-bit
+				| (1U << 11) // PSIZE = 16-bit
+				| (1U << 10) // MINC: memory increment
+				| (1U << 6); // DIR: memory-to-peripheral
+
+		// Enable SPI TX DMA request
+		regs()->CR2 |= (1U << 1); // TXDMAEN
+
+		// Start transfer
+		*s4cr |= 1U; // EN
+	}
+
+	/// Wait for async DMA transfer to complete, restore 8-bit SPI mode.
+	static void transmit16_wait()
+	{
+		static_assert(Inst == SpiInstance::SPI5, "DMA only implemented for SPI5");
+
+		static constexpr uint32_t DMA2_BASE		 = 0x40026400;
+		static constexpr uint32_t STREAM4_OFFSET = 0x70;
+		auto* s4cr								 = reinterpret_cast<volatile uint32_t*>(DMA2_BASE + STREAM4_OFFSET);
+		auto* hisr								 = reinterpret_cast<volatile uint32_t*>(DMA2_BASE + 0x04);
+		auto* hifcr								 = reinterpret_cast<volatile uint32_t*>(DMA2_BASE + 0x0C);
+
+		// Wait for TCIF4 (bit 5 of HISR)
+		while (!(*hisr & (1U << 5)))
+		{}
+
+		// Clear flags, disable stream
+		*hifcr = 0x3DU;
+		*s4cr  = 0;
+
+		// Disable SPI TX DMA request
+		regs()->CR2 &= ~(1U << 1);
+
+		// Wait for SPI to finish transmitting
+		wait_idle();
+
+		// Back to 8-bit mode
+		regs()->CR1 &= ~(1U << 6);	// Disable SPE
+		regs()->CR1 &= ~(1U << 11); // DFF: 8-bit
+		regs()->CR1 |= (1U << 6);	// Enable SPE
+	}
 };
 
 } // namespace lumen::hal::stm32

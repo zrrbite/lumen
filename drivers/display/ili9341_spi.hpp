@@ -90,6 +90,21 @@ template <typename SpiDrv, typename PinDC, typename PinCS, typename PinRST> clas
 
 	bool supports_dma() const { return SpiDrv::has_dma; }
 
+	/// Start async pixel write via DMA. Call write_pixels_wait() before next SPI use.
+	void write_pixels_start(const pixel_t* data, uint32_t count)
+	{
+		PinDC::high();
+		PinCS::low();
+		SpiDrv::transmit16_start(data, count);
+	}
+
+	/// Wait for async pixel write to complete.
+	void write_pixels_wait()
+	{
+		SpiDrv::transmit16_wait();
+		PinCS::high();
+	}
+
 	/// Fill a region with a single color (optimized — avoids framebuffer).
 	void fill(Rect area, pixel_t color)
 	{

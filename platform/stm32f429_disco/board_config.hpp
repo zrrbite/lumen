@@ -63,7 +63,7 @@ struct Stm32f429DiscoConfig
 	using OS	  = hal::BareMetalOS;
 
 	static constexpr size_t framebuffer_count	= 0;
-	static constexpr size_t scratch_buffer_size = 4800; // 10 lines × 240px × 2B
+	static constexpr size_t scratch_buffer_size = 9600; // 20 lines × 240px × 2B
 	static constexpr bool use_external_ram		= false;
 	static constexpr bool has_dma2d				= true;
 
@@ -116,7 +116,8 @@ struct Stm32f429DiscoConfig
 		I2C3_SDA::init_af_od(4);
 
 		// Init peripherals
-		SPI5Drv::init_master(2); // ~11MHz (APB2=90MHz / 8)
+		SPI5Drv::init_master(0); // ~45MHz (APB2=90MHz / 2)
+		SPI5Drv::enable_dma_clock();
 		I2C3Drv::init();
 		Dma2d::enable_clock();
 

@@ -83,7 +83,7 @@ template <typename BoardConfig> class Application
 	  public:
 		explicit InputTaskImpl(Application& app) : app_(app) {}
 		void execute(TickMs /*now*/) override { app_.process_input(); }
-		TickMs period_ms() const override { return 0; } // Every cycle
+		TickMs period_ms() const override { return 16; } // ~60Hz touch
 		uint8_t priority() const override { return 10; }
 		const char* name() const override { return "input"; }
 
@@ -206,14 +206,17 @@ template <typename BoardConfig> class Application
 		else
 		{
 			// Direct-to-display mode (SPI TFT, no framebuffer)
-			// Render line-by-line using scratch buffer
+			// Double-buffered: render to back while DMA sends front.
 			static constexpr size_t scratch_pixels = BoardConfig::scratch_buffer_size / sizeof(pixel_t);
-			static pixel_t scratch[scratch_pixels];
+			static pixel_t scratch_a[scratch_pixels];
+			static pixel_t scratch_b[scratch_pixels];
+			pixel_t* back	= scratch_a;
+			pixel_t* front	= scratch_b;
+			bool dma_active = false;
 
 			for (uint8_t d = 0; d < dirty_.count(); ++d)
 			{
-				Rect dirty = dirty_.rect(d);
-				// Render in horizontal bands that fit the scratch buffer
+				Rect dirty		= dirty_.rect(d);
 				uint16_t band_h = scratch_pixels / dirty.w;
 				if (band_h == 0)
 					band_h = 1;
@@ -226,11 +229,11 @@ template <typename BoardConfig> class Application
 
 					uint32_t band_pixels = static_cast<uint32_t>(dirty.w) * h;
 
-					// Clear scratch buffer (DMA2D on STM32, CPU loop on desktop)
-					BoardConfig::hw_fill(scratch, dirty.w, h, 0);
+					// Render to back buffer (overlaps with DMA of front)
+					BoardConfig::hw_fill(back, dirty.w, h, 0);
 
 					Rect band{dirty.x, band_y, dirty.w, h};
-					gfx::Canvas<PF> canvas(scratch, dirty.w, h);
+					gfx::Canvas<PF> canvas(back, dirty.w, h);
 
 					if (in_transition && outgoing_screen_)
 					{
@@ -240,14 +243,12 @@ template <typename BoardConfig> class Application
 						if (type == ui::TransitionType::SlideBoth || type == ui::TransitionType::SlideIn ||
 							type == ui::TransitionType::SlideOut)
 						{
-							// Draw outgoing with offset
 							Point out_off = tr.outgoing_offset();
 							canvas.set_origin(static_cast<int16_t>(dirty.x - out_off.x),
 											  static_cast<int16_t>(band_y - out_off.y));
 							canvas.set_clip(band);
 							outgoing_screen_->draw(canvas);
 
-							// Draw incoming with offset (overwrites where it overlaps)
 							Point in_off = tr.incoming_offset();
 							canvas.set_origin(static_cast<int16_t>(dirty.x - in_off.x),
 											  static_cast<int16_t>(band_y - in_off.y));
@@ -256,7 +257,6 @@ template <typename BoardConfig> class Application
 						}
 						else if (type == ui::TransitionType::WipeDown || type == ui::TransitionType::WipeRight)
 						{
-							// Outgoing for its clip region
 							Rect out_clip = tr.outgoing_clip().intersection(band);
 							if (!out_clip.empty())
 							{
@@ -264,7 +264,6 @@ template <typename BoardConfig> class Application
 								canvas.set_clip(out_clip);
 								outgoing_screen_->draw(canvas);
 							}
-							// Incoming for its clip region
 							Rect in_clip = tr.incoming_clip().intersection(band);
 							if (!in_clip.empty())
 							{
@@ -275,7 +274,6 @@ template <typename BoardConfig> class Application
 						}
 						else
 						{
-							// Fallback: just draw incoming
 							canvas.set_origin(dirty.x, band_y);
 							canvas.set_clip(band);
 							active_screen_->draw(canvas);
@@ -288,10 +286,25 @@ template <typename BoardConfig> class Application
 						active_screen_->draw(canvas);
 					}
 
+					// Wait for previous DMA before using SPI for set_window
+					if (dma_active)
+						board_.display.write_pixels_wait();
+
+					// Start async DMA send of back buffer
 					board_.display.set_window(band);
-					board_.display.write_pixels(scratch, band_pixels);
+					board_.display.write_pixels_start(back, band_pixels);
+					dma_active = true;
+
+					// Swap: next band renders to the other buffer
+					pixel_t* tmp = back;
+					back		 = front;
+					front		 = tmp;
 				}
 			}
+
+			// Wait for final DMA to complete
+			if (dma_active)
+				board_.display.write_pixels_wait();
 		}
 
 		dirty_.clear();
