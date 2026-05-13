@@ -89,7 +89,7 @@ struct Dma2d
 		regs()->CR	   = (static_cast<uint32_t>(Dma2dMode::R2M) << 16);
 		regs()->OPFCCR = static_cast<uint32_t>(fmt);
 		regs()->OCOLR  = color;
-		regs()->OMAR   = reinterpret_cast<uint32_t>(dst_addr);
+		regs()->OMAR   = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(dst_addr));
 		regs()->OOR	   = dst_w - area.w;
 		regs()->NLR	   = (static_cast<uint32_t>(area.w) << 16) | area.h;
 		regs()->CR |= 1U; // START
@@ -121,10 +121,10 @@ struct Dma2d
 
 		regs()->CR		= (static_cast<uint32_t>(Dma2dMode::M2M) << 16);
 		regs()->FGPFCCR = static_cast<uint32_t>(fmt);
-		regs()->FGMAR	= reinterpret_cast<uint32_t>(src_addr);
+		regs()->FGMAR	= static_cast<uint32_t>(reinterpret_cast<uintptr_t>(src_addr));
 		regs()->FGOR	= src_w - src_rect.w;
 		regs()->OPFCCR	= static_cast<uint32_t>(fmt);
-		regs()->OMAR	= reinterpret_cast<uint32_t>(dst_addr);
+		regs()->OMAR	= static_cast<uint32_t>(reinterpret_cast<uintptr_t>(dst_addr));
 		regs()->OOR		= dst_w - src_rect.w;
 		regs()->NLR		= (static_cast<uint32_t>(src_rect.w) << 16) | src_rect.h;
 		regs()->CR |= 1U; // START
@@ -150,13 +150,13 @@ struct Dma2d
 
 		regs()->CR		= (static_cast<uint32_t>(Dma2dMode::M2M_BLEND) << 16);
 		regs()->FGPFCCR = static_cast<uint32_t>(fg_fmt) | (static_cast<uint32_t>(fg_alpha) << 24);
-		regs()->FGMAR	= reinterpret_cast<uint32_t>(fg);
+		regs()->FGMAR	= static_cast<uint32_t>(reinterpret_cast<uintptr_t>(fg));
 		regs()->FGOR	= fg_w - width;
 		regs()->BGPFCCR = static_cast<uint32_t>(bg_fmt);
-		regs()->BGMAR	= reinterpret_cast<uint32_t>(bg);
+		regs()->BGMAR	= static_cast<uint32_t>(reinterpret_cast<uintptr_t>(bg));
 		regs()->BGOR	= bg_w - width;
 		regs()->OPFCCR	= static_cast<uint32_t>(dst_fmt);
-		regs()->OMAR	= reinterpret_cast<uint32_t>(dst);
+		regs()->OMAR	= static_cast<uint32_t>(reinterpret_cast<uintptr_t>(dst));
 		regs()->OOR		= dst_w - width;
 		regs()->NLR		= (static_cast<uint32_t>(width) << 16) | height;
 		regs()->CR |= 1U; // START

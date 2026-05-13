@@ -158,8 +158,8 @@ template <SpiInstance Inst> struct Spi
 		*hifcr = 0x3DU;
 
 		// Configure: Channel 2, mem-to-periph, 16-bit, memory increment
-		*s4par	= reinterpret_cast<uint32_t>(&regs()->DR);
-		*s4m0ar = reinterpret_cast<uint32_t>(data);
+		*s4par	= static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&regs()->DR));
+		*s4m0ar = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(data));
 		*s4ndtr = count;
 		*s4cr	= (2U << 25) // CHSEL = 2 (SPI5_TX)
 				| (1U << 13) // MSIZE = 16-bit

@@ -242,10 +242,10 @@ int main()
 
 	ctrl.magic		  = 0;
 	ctrl.step_count	  = num_steps;
-	ctrl.fb_addr	  = reinterpret_cast<uint32_t>(test_fb);
+	ctrl.fb_addr	  = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(test_fb));
 	ctrl.fb_w		  = FB_W;
 	ctrl.fb_h		  = FB_H;
-	ctrl.results_addr = reinterpret_cast<uint32_t>(results);
+	ctrl.results_addr = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(results));
 
 	for (uint32_t i = 0; i < num_steps; ++i)
 	{
